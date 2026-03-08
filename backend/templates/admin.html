@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AtomicPay Admin</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<style>
+body { display: block; }
+.dashboard { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--bdr); }
+.dash-header h1 { font-size: 22px; font-weight: 800; }
+.dash-header h1 span { color: var(--accent); }
+.dash-nav { display: flex; gap: 8px; flex-wrap: wrap; }
+.dash-nav a { color: var(--muted); text-decoration: none; font-size: 12px; padding: 6px 12px; border: 1px solid var(--bdr); border-radius: 8px; }
+.dash-nav a:hover, .dash-nav a.active { color: var(--accent); border-color: var(--accent); }
+.metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.metric { background: var(--sur); border: 1px solid var(--bdr); border-radius: 14px; padding: 16px; }
+.metric .label { font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.metric .value { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 700; color: #fff; }
+.metric .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.section { margin-bottom: 24px; }
+.section h2 { font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: .5px; margin-bottom: 12px; text-transform: uppercase; }
+.data-table { width: 100%; border-collapse: collapse; background: var(--sur); border-radius: 12px; overflow: hidden; }
+.data-table th { background: var(--card); color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 10px 14px; text-align: left; }
+.data-table td { padding: 10px 14px; font-size: 13px; border-top: 1px solid var(--bdr); }
+.data-table tr:hover td { background: rgba(79,127,255,.03); }
+.state-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+.state-1 { background: #081a10; color: var(--green); }
+.state--1 { background: #1a080e; color: var(--red); }
+.login-card { max-width: 400px; margin: 100px auto; padding: 32px; background: var(--sur); border: 1px solid var(--bdr); border-radius: 16px; }
+.login-card h2 { text-align: center; margin-bottom: 20px; }
+.bank-section { background: var(--sur); border: 1px solid var(--bdr); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+.bank-section h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--accent); }
+.log-entry { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 3px 0; }
+.log-ok { color: var(--green); }
+.log-fail { color: var(--red); }
+.log-rollback { color: var(--gold); }
+.scroll-box { max-height: 300px; overflow-y: auto; }
+.tab-bar { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+.tab-btn { padding: 8px 16px; border: 1px solid var(--bdr); border-radius: 8px; background: var(--sur); color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; }
+.tab-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+</style>
+</head>
+<body>
+<div class="dashboard" id="loginView">
+  <div class="login-card">
+    <h2>Admin Login</h2>
+    <div class="err" id="adminErr"></div>
+    <div class="fbody" style="padding:0">
+      <div class="field">
+        <div class="flbl">Mobile</div>
+        <input class="fi mono" type="tel" id="adminMob" placeholder="0000000000" value="0000000000">
+      </div>
+      <div class="field">
+        <div class="flbl">PIN</div>
+        <input class="fi mono" type="password" id="adminPin" placeholder="admin123" value="admin123">
+      </div>
+      <button class="btn btn-p" onclick="adminLogin()">Sign In</button>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard" id="dashView" style="display:none">
+  <div class="dash-header">
+    <h1><span>&#9889;</span> AtomicPay Admin</h1>
+    <div class="dash-nav">
+      <a href="/">App</a>
+      <a href="/compliance">Compliance</a>
+      <a href="/developer">Developer</a>
+      <a href="#" onclick="adminLogout()">Logout</a>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn" onclick="switchTab('users')">Users</button>
+    <button class="tab-btn" onclick="switchTab('transactions')">Transactions</button>
+    <button class="tab-btn" onclick="switchTab('banks')">Banks</button>
+    <button class="tab-btn" onclick="switchTab('audit')">Audit Logs</button>
+  </div>
+
+  <div class="tab-panel active" id="tab-overview">
+    <div class="metrics" id="metricsGrid"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-users">
+    <div class="section">
+      <h2>Registered Users</h2>
+      <div class="scroll-box"><table class="data-table" id="usersTable"><tr><td>Loading...</td></tr></table></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-transactions">
+    <div class="section">
+      <h2>Transaction Explorer</h2>
+      <div class="scroll-box"><table class="data-table" id="txTable"><tr><td>Loading...</td></tr></table></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-banks">
+    <div class="section">
+      <h2>Bank Simulators</h2>
+      <div id="bankAccounts"></div>
+    </div>
+    <div class="section">
+      <h2>Bank A Logs</h2>
+      <div class="bank-section scroll-box" id="bankALogs">Loading...</div>
+    </div>
+    <div class="section">
+      <h2>Bank B Logs</h2>
+      <div class="bank-section scroll-box" id="bankBLogs">Loading...</div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-audit">
+    <div class="section">
+      <h2>Audit Logs</h2>
+      <div class="scroll-box"><table class="data-table" id="auditTable"><tr><td>Loading...</td></tr></table></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let ADMIN_TOKEN = localStorage.getItem('ap_admin_token') || '';
+
+async function aapi(path, data, method) {
+  const opts = { headers: { 'Authorization': 'Bearer ' + ADMIN_TOKEN } };
+  if (data) { opts.method = method || 'POST'; opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(data); }
+  else { opts.method = method || 'GET'; }
+  const r = await fetch('/api' + path, opts);
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || 'Error'); }
+  return r.json();
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`#tab-${tab}`).classList.add('active');
+  event.target.classList.add('active');
+  if (tab === 'overview') loadMetrics();
+  if (tab === 'users') loadUsers();
+  if (tab === 'transactions') loadTx();
+  if (tab === 'banks') loadBankData();
+  if (tab === 'audit') loadAudit();
+}
+
+async function adminLogin() {
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mobile: document.getElementById('adminMob').value, pin: document.getElementById('adminPin').value })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Login failed');
+    if (data.role !== 'admin') throw new Error('Admin access required');
+    ADMIN_TOKEN = data.token;
+    localStorage.setItem('ap_admin_token', ADMIN_TOKEN);
+    showDash();
+  } catch (e) {
+    const err = document.getElementById('adminErr');
+    err.textContent = e.message; err.style.display = 'block';
+  }
+}
+
+function adminLogout() {
+  ADMIN_TOKEN = '';
+  localStorage.removeItem('ap_admin_token');
+  document.getElementById('dashView').style.display = 'none';
+  document.getElementById('loginView').style.display = 'block';
+}
+
+async function showDash() {
+  document.getElementById('loginView').style.display = 'none';
+  document.getElementById('dashView').style.display = 'block';
+  loadMetrics();
+}
+
+async function loadMetrics() {
+  try {
+    const m = await aapi('/admin/metrics');
+    document.getElementById('metricsGrid').innerHTML = `
+      <div class="metric"><div class="label">Total Users</div><div class="value">${m.total_users}</div></div>
+      <div class="metric"><div class="label">Total Banks</div><div class="value">${m.total_banks}</div></div>
+      <div class="metric"><div class="label">Transactions</div><div class="value">${m.total_transactions}</div></div>
+      <div class="metric"><div class="label">TPS</div><div class="value">${m.tps}</div></div>
+      <div class="metric"><div class="label">Avg Latency</div><div class="value">${m.avg_latency_ms}ms</div></div>
+      <div class="metric"><div class="label">Success Rate</div><div class="value">${m.success_rate}%</div></div>
+      <div class="metric"><div class="label">AML Alerts</div><div class="value" style="color:${m.open_aml_alerts > 0 ? 'var(--red)' : 'var(--green)'}">${m.open_aml_alerts}</div></div>
+      <div class="metric"><div class="label">Fraud Flags</div><div class="value">${m.fraud_flags}</div></div>
+      <div class="metric"><div class="label">Uptime</div><div class="value" style="font-size:16px">${m.uptime_formatted}</div></div>
+      <div class="metric"><div class="label">Today Volume</div><div class="value" style="font-size:16px">Rs.${Number(m.today_volume).toLocaleString('en-IN')}</div></div>
+      <div class="metric"><div class="label">Gateway</div><div class="value" style="color:var(--green)">${m.gateway_status}</div></div>
+    `;
+  } catch (e) { document.getElementById('metricsGrid').innerHTML = '<div class="metric"><div class="value" style="color:var(--red)">Error loading metrics</div></div>'; }
+}
+
+async function loadUsers() {
+  try {
+    const users = await aapi('/admin/users');
+    const t = document.getElementById('usersTable');
+    t.innerHTML = '<tr><th>Name</th><th>Mobile</th><th>Bank</th><th>Account</th><th>KYC</th><th>Role</th></tr>';
+    users.forEach(u => {
+      t.innerHTML += `<tr><td>${u.name}</td><td style="font-family:monospace">${u.mobile}</td><td>${u.bank_id||'—'}</td><td style="font-family:monospace">${u.account_id||'—'}</td><td>L${u.kyc_level}</td><td>${u.role}</td></tr>`;
+    });
+  } catch(e) {}
+}
+
+async function loadTx() {
+  try {
+    const txns = await aapi('/admin/transactions');
+    const t = document.getElementById('txTable');
+    t.innerHTML = '<tr><th>TX ID</th><th>State</th><th>Amount</th><th>From</th><th>To</th><th>Transit</th><th>Fraud</th><th>Time</th></tr>';
+    txns.forEach(tx => {
+      t.innerHTML += `<tr>
+        <td style="font-family:monospace;font-size:11px">${tx.tx_id.substring(0,8)}</td>
+        <td><span class="state-badge state-${tx.state}">${tx.state === 1 ? '+1 Sattva' : '-1 Tamas'}</span></td>
+        <td>Rs.${Number(tx.amount).toLocaleString('en-IN')}</td>
+        <td>${tx.sender_name}</td><td>${tx.receiver_name}</td>
+        <td style="font-family:monospace">${tx.transit_ms}ms</td>
+        <td style="color:${tx.fraud_score > 0.5 ? 'var(--red)' : 'var(--green)'}">${tx.fraud_score}</td>
+        <td style="font-size:11px">${tx.created_at ? new Date(tx.created_at).toLocaleString() : ''}</td>
+      </tr>`;
+    });
+  } catch(e) {}
+}
+
+async function loadBankData() {
+  try {
+    const accs = await aapi('/admin/bank_accounts');
+    const div = document.getElementById('bankAccounts');
+    let html = '';
+    for (const [bankId, accounts] of Object.entries(accs)) {
+      html += `<div class="bank-section"><h3>${bankId === 'bank_a' ? 'Bharatiya Gramin Bank' : 'Rashtriya Vyapar Bank'}</h3>`;
+      for (const [accId, acc] of Object.entries(accounts)) {
+        html += `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bdr)">
+          <span style="font-family:monospace">${accId} - ${acc.name}</span>
+          <span style="font-family:monospace;color:${acc.balance > 500 ? 'var(--green)' : 'var(--gold)'}">Rs.${Number(acc.balance).toLocaleString('en-IN')}</span>
+        </div>`;
+      }
+      html += '</div>';
+    }
+    div.innerHTML = html;
+
+    const logsA = await aapi('/admin/bank_logs/bank_a');
+    document.getElementById('bankALogs').innerHTML = logsA.length
+      ? logsA.map(l => `<div class="log-entry ${l.includes('OK') ? 'log-ok' : l.includes('FAIL') ? 'log-fail' : l.includes('ROLLBACK') ? 'log-rollback' : ''}">${l}</div>`).join('')
+      : '<div style="color:var(--muted)">No logs yet</div>';
+
+    const logsB = await aapi('/admin/bank_logs/bank_b');
+    document.getElementById('bankBLogs').innerHTML = logsB.length
+      ? logsB.map(l => `<div class="log-entry ${l.includes('OK') ? 'log-ok' : l.includes('FAIL') ? 'log-fail' : l.includes('ROLLBACK') ? 'log-rollback' : ''}">${l}</div>`).join('')
+      : '<div style="color:var(--muted)">No logs yet</div>';
+  } catch(e) {}
+}
+
+async function loadAudit() {
+  try {
+    const logs = await aapi('/regulatory/audit_logs');
+    const t = document.getElementById('auditTable');
+    t.innerHTML = '<tr><th>Event</th><th>Actor</th><th>Details</th><th>Time</th></tr>';
+    logs.forEach(l => {
+      t.innerHTML += `<tr><td style="font-weight:600">${l.event_type}</td><td style="font-family:monospace">${l.actor}</td><td style="font-size:11px">${l.details||''}</td><td style="font-size:11px">${l.timestamp ? new Date(l.timestamp).toLocaleString() : ''}</td></tr>`;
+    });
+  } catch(e) {}
+}
+
+if (ADMIN_TOKEN) {
+  aapi('/admin/metrics').then(() => showDash()).catch(() => adminLogout());
+}
+</script>
+</body>
+</html>

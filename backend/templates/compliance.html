@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AtomicPay Compliance</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<style>
+body { display: block; }
+.dashboard { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--bdr); }
+.dash-header h1 { font-size: 22px; font-weight: 800; }
+.dash-header h1 span { color: var(--gold); }
+.dash-nav { display: flex; gap: 8px; flex-wrap: wrap; }
+.dash-nav a { color: var(--muted); text-decoration: none; font-size: 12px; padding: 6px 12px; border: 1px solid var(--bdr); border-radius: 8px; }
+.dash-nav a:hover { color: var(--accent); border-color: var(--accent); }
+.section { margin-bottom: 24px; }
+.section h2 { font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: .5px; margin-bottom: 12px; text-transform: uppercase; }
+.data-table { width: 100%; border-collapse: collapse; background: var(--sur); border-radius: 12px; overflow: hidden; }
+.data-table th { background: var(--card); color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 10px 14px; text-align: left; }
+.data-table td { padding: 10px 14px; font-size: 13px; border-top: 1px solid var(--bdr); }
+.scroll-box { max-height: 400px; overflow-y: auto; }
+.tab-bar { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+.tab-btn { padding: 8px 16px; border: 1px solid var(--bdr); border-radius: 8px; background: var(--sur); color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; }
+.tab-btn.active { background: var(--gold); color: #000; border-color: var(--gold); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.action-btn { padding: 4px 10px; border: 1px solid var(--bdr); border-radius: 6px; background: var(--sur); color: var(--txt); font-size: 11px; cursor: pointer; margin-right: 4px; }
+.action-btn:hover { border-color: var(--accent); }
+.action-btn.approve { color: var(--green); border-color: var(--green); }
+.action-btn.reject { color: var(--red); border-color: var(--red); }
+.risk-high { color: var(--red); font-weight: 700; }
+.risk-med { color: var(--gold); font-weight: 700; }
+.risk-low { color: var(--green); }
+.status-open { color: var(--gold); }
+.status-resolved { color: var(--green); }
+.status-dismissed { color: var(--muted); }
+.report-card { background: var(--sur); border: 1px solid var(--bdr); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+.report-card h3 { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 12px; }
+.report-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--bdr); }
+.report-label { color: var(--muted); }
+.report-value { font-family: 'JetBrains Mono', monospace; }
+.login-card { max-width: 400px; margin: 100px auto; padding: 32px; background: var(--sur); border: 1px solid var(--bdr); border-radius: 16px; }
+.login-card h2 { text-align: center; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<div class="dashboard" id="loginView">
+  <div class="login-card">
+    <h2>Compliance Login</h2>
+    <div class="err" id="cErr"></div>
+    <div class="fbody" style="padding:0">
+      <div class="field">
+        <div class="flbl">Mobile</div>
+        <input class="fi mono" type="tel" id="cMob" value="0000000000">
+      </div>
+      <div class="field">
+        <div class="flbl">PIN</div>
+        <input class="fi mono" type="password" id="cPin" value="admin123">
+      </div>
+      <button class="btn btn-p" onclick="cLogin()">Sign In</button>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard" id="dashView" style="display:none">
+  <div class="dash-header">
+    <h1><span>&#128737;</span> Compliance Dashboard</h1>
+    <div class="dash-nav">
+      <a href="/">App</a>
+      <a href="/admin">Admin</a>
+      <a href="/developer">Developer</a>
+      <a href="#" onclick="cLogout()">Logout</a>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="cTab('aml')">AML Alerts</button>
+    <button class="tab-btn" onclick="cTab('fraud')">Fraud Flags</button>
+    <button class="tab-btn" onclick="cTab('kyc')">KYC Records</button>
+    <button class="tab-btn" onclick="cTab('reports')">Reports</button>
+  </div>
+
+  <div class="tab-panel active" id="tab-aml">
+    <div class="section">
+      <h2>AML Alerts</h2>
+      <div class="scroll-box"><table class="data-table" id="amlTable"><tr><td>Loading...</td></tr></table></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-fraud">
+    <div class="section">
+      <h2>Fraud Flags</h2>
+      <div class="scroll-box"><table class="data-table" id="fraudTable"><tr><td>Loading...</td></tr></table></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-kyc">
+    <div class="section">
+      <h2>KYC Verification Queue</h2>
+      <div class="scroll-box"><table class="data-table" id="kycTable"><tr><td>Loading...</td></tr></table></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-reports">
+    <div class="section">
+      <h2>Regulatory Reports</h2>
+      <div id="reportContent">Loading...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let CT = localStorage.getItem('ap_comp_token') || '';
+
+async function capi(path, data, method) {
+  const opts = { headers: { 'Authorization': 'Bearer ' + CT } };
+  if (data) { opts.method = method || 'POST'; opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(data); }
+  else { opts.method = method || 'GET'; }
+  const r = await fetch('/api' + path, opts);
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || 'Error'); }
+  return r.json();
+}
+
+function cTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`#tab-${tab}`).classList.add('active');
+  event.target.classList.add('active');
+  if (tab === 'aml') loadAML();
+  if (tab === 'fraud') loadFraud();
+  if (tab === 'kyc') loadKYC();
+  if (tab === 'reports') loadReport();
+}
+
+async function cLogin() {
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mobile: document.getElementById('cMob').value, pin: document.getElementById('cPin').value })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Failed');
+    if (data.role !== 'admin') throw new Error('Admin required');
+    CT = data.token; localStorage.setItem('ap_comp_token', CT); showDash();
+  } catch (e) {
+    const err = document.getElementById('cErr'); err.textContent = e.message; err.style.display = 'block';
+  }
+}
+
+function cLogout() { CT = ''; localStorage.removeItem('ap_comp_token'); location.reload(); }
+
+function showDash() {
+  document.getElementById('loginView').style.display = 'none';
+  document.getElementById('dashView').style.display = 'block';
+  loadAML();
+}
+
+function riskClass(s) { return s >= 0.7 ? 'risk-high' : s >= 0.4 ? 'risk-med' : 'risk-low'; }
+
+async function loadAML() {
+  try {
+    const alerts = await capi('/compliance/aml_alerts');
+    const t = document.getElementById('amlTable');
+    t.innerHTML = '<tr><th>ID</th><th>User</th><th>TX</th><th>Risk</th><th>Reason</th><th>Status</th><th>Actions</th></tr>';
+    if (!alerts.length) { t.innerHTML += '<tr><td colspan="7" style="color:var(--green);text-align:center">No AML alerts</td></tr>'; return; }
+    alerts.forEach(a => {
+      t.innerHTML += `<tr>
+        <td>#${a.id}</td><td>User ${a.user_id}</td>
+        <td style="font-family:monospace;font-size:11px">${(a.tx_id||'').substring(0,8)}</td>
+        <td class="${riskClass(a.risk_score)}">${a.risk_score}</td>
+        <td style="font-size:11px">${a.reason}</td>
+        <td class="status-${a.status}">${a.status}</td>
+        <td>${a.status === 'open' ? `<button class="action-btn approve" onclick="amlAction(${a.id},'resolved')">Resolve</button><button class="action-btn reject" onclick="amlAction(${a.id},'dismissed')">Dismiss</button>` : ''}</td>
+      </tr>`;
+    });
+  } catch(e) {}
+}
+
+async function amlAction(id, action) {
+  try { await capi('/compliance/aml_action', { alert_id: id, action }); loadAML(); } catch(e) { alert(e.message); }
+}
+
+async function loadFraud() {
+  try {
+    const flags = await capi('/compliance/fraud_flags');
+    const t = document.getElementById('fraudTable');
+    t.innerHTML = '<tr><th>ID</th><th>User</th><th>TX</th><th>Risk Score</th><th>Type</th><th>Time</th></tr>';
+    if (!flags.length) { t.innerHTML += '<tr><td colspan="6" style="color:var(--green);text-align:center">No fraud flags</td></tr>'; return; }
+    flags.forEach(f => {
+      t.innerHTML += `<tr>
+        <td>#${f.id}</td><td>User ${f.user_id}</td>
+        <td style="font-family:monospace;font-size:11px">${(f.tx_id||'').substring(0,8)||'—'}</td>
+        <td class="${riskClass(f.risk_score)}">${f.risk_score}</td>
+        <td>${f.flag_type}</td>
+        <td style="font-size:11px">${f.created_at ? new Date(f.created_at).toLocaleString() : ''}</td>
+      </tr>`;
+    });
+  } catch(e) {}
+}
+
+async function loadKYC() {
+  try {
+    const records = await capi('/compliance/kyc_records');
+    const t = document.getElementById('kycTable');
+    t.innerHTML = '<tr><th>ID</th><th>User</th><th>Type</th><th>Number</th><th>Status</th><th>Actions</th></tr>';
+    if (!records.length) { t.innerHTML += '<tr><td colspan="6" style="color:var(--muted);text-align:center">No KYC records</td></tr>'; return; }
+    records.forEach(r => {
+      t.innerHTML += `<tr>
+        <td>#${r.id}</td><td>User ${r.user_id}</td>
+        <td>${r.document_type}</td>
+        <td style="font-family:monospace">${r.document_number}</td>
+        <td style="color:${r.verification_status === 'verified' ? 'var(--green)' : r.verification_status === 'rejected' ? 'var(--red)' : 'var(--gold)'}">${r.verification_status}</td>
+        <td>${r.verification_status === 'pending' ? `<button class="action-btn approve" onclick="kycAction(${r.id},true)">Approve</button><button class="action-btn reject" onclick="kycAction(${r.id},false)">Reject</button>` : ''}</td>
+      </tr>`;
+    });
+  } catch(e) {}
+}
+
+async function kycAction(id, approve) {
+  try { await capi('/compliance/kyc_verify', { record_id: id, approve }); loadKYC(); } catch(e) { alert(e.message); }
+}
+
+async function loadReport() {
+  try {
+    const r = await capi('/regulatory/reports');
+    document.getElementById('reportContent').innerHTML = `
+      <div class="report-card">
+        <h3>RBI Sandbox Compliance Report</h3>
+        <div class="report-row"><span class="report-label">Generated</span><span class="report-value">${new Date(r.generated_at).toLocaleString()}</span></div>
+        <div class="report-row"><span class="report-label">Compliance Status</span><span class="report-value" style="color:${r.compliance_status === 'COMPLIANT' ? 'var(--green)' : 'var(--gold)'}">${r.compliance_status}</span></div>
+        <div class="report-row"><span class="report-label">Total Transactions</span><span class="report-value">${r.metrics.total_transactions}</span></div>
+        <div class="report-row"><span class="report-label">Success Rate</span><span class="report-value">${r.metrics.success_rate}%</span></div>
+        <div class="report-row"><span class="report-label">Avg Latency</span><span class="report-value">${r.metrics.avg_latency_ms}ms</span></div>
+        <div class="report-row"><span class="report-label">Open AML Alerts</span><span class="report-value">${r.aml_summary.open_alerts}</span></div>
+        <div class="report-row"><span class="report-label">Total AML Alerts</span><span class="report-value">${r.aml_summary.total_alerts}</span></div>
+        <div class="report-row"><span class="report-label">Pending KYC</span><span class="report-value">${r.kyc_summary.pending_verifications}</span></div>
+      </div>
+    `;
+  } catch(e) { document.getElementById('reportContent').innerHTML = '<div style="color:var(--red)">Failed to load report</div>'; }
+}
+
+if (CT) { capi('/compliance/aml_alerts').then(() => showDash()).catch(() => cLogout()); }
+</script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>AtomicPay</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="phone">
+
+<div class="scr on" id="scrWelcome">
+  <div class="wlogo">
+    <span class="bolt">&#9889;</span>
+    <h1>AtomicPay</h1>
+    <span class="wtag">TAMAS &middot; RAJAS &middot; SATTVA</span>
+  </div>
+  <div class="wbtns">
+    <button class="btn btn-p" onclick="show('scrRegister')">Create Account</button>
+    <button class="btn btn-o" onclick="show('scrLogin')">Sign In</button>
+  </div>
+  <div class="wfoot">
+    -1 &middot; 0 &middot; +1 &nbsp;|&nbsp; No suspense. No float.<br>
+    The World's First Atomic Payment System
+  </div>
+  <div class="wlinks">
+    <a href="/admin">Admin</a>
+    <a href="/compliance">Compliance</a>
+    <a href="/developer">Developer</a>
+  </div>
+</div>
+
+<div class="scr" id="scrRegister">
+  <div class="scrh">
+    <button class="back" onclick="show('scrWelcome')">&larr;</button>
+    <h2>Create Account</h2>
+  </div>
+  <div class="fbody">
+    <div class="err" id="regErr"></div>
+    <div class="field">
+      <div class="flbl">Full Name</div>
+      <input class="fi" type="text" id="regName" placeholder="Ram Kumar" autocomplete="off">
+    </div>
+    <div class="field">
+      <div class="flbl">Mobile Number</div>
+      <input class="fi mono" type="tel" id="regMobile" placeholder="9876543210" maxlength="10" inputmode="numeric">
+    </div>
+    <div class="field">
+      <div class="flbl">Create PIN</div>
+      <input class="fi mono" type="password" id="regPin" placeholder="&middot; &middot; &middot; &middot;" maxlength="4" inputmode="numeric">
+    </div>
+    <div class="hint">Demo accounts: Ram (9876543210/1234), Sita (9876543211/1234), Arjun (9876543212/1234)</div>
+    <button class="btn btn-p" id="regBtn" onclick="doRegister()">Create Account</button>
+  </div>
+</div>
+
+<div class="scr" id="scrLogin">
+  <div class="scrh">
+    <button class="back" onclick="show('scrWelcome')">&larr;</button>
+    <h2>Sign In</h2>
+  </div>
+  <div class="fbody">
+    <div class="err" id="loginErr"></div>
+    <div class="field">
+      <div class="flbl">Mobile Number</div>
+      <input class="fi mono" type="tel" id="loginMobile" placeholder="9876543210" maxlength="10" inputmode="numeric">
+    </div>
+    <div class="field">
+      <div class="flbl">PIN</div>
+      <input class="fi mono" type="password" id="loginPin" placeholder="&middot; &middot; &middot; &middot;" maxlength="4" inputmode="numeric">
+    </div>
+    <div class="hint">Demo: 9876543210 / 1234 &nbsp;|&nbsp; Admin: 0000000000 / admin123</div>
+    <button class="btn btn-p" id="loginBtn" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<div class="scr" id="scrLinkBank">
+  <div class="scrh">
+    <div style="width:36px"></div>
+    <h2>Link Your Bank</h2>
+  </div>
+  <div class="fbody">
+    <div class="err" id="linkErr"></div>
+    <div class="ok" id="linkOk"></div>
+    <div class="field">
+      <div class="flbl">Select Your Bank</div>
+      <div class="bank-grid" id="bankGrid">
+        <div style="color:var(--muted);font-size:13px;padding:8px">Loading banks...</div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="flbl">Your Account Number</div>
+      <input class="fi mono" type="text" id="linkAcc" placeholder="e.g. RAM_001" autocomplete="off" autocapitalize="characters">
+      <div class="hint">Demo: RAM_001 (Bank A) &middot; SITA_001 (Bank B) &middot; ARJUN_01 (Bank A)</div>
+    </div>
+    <button class="btn btn-g" id="linkBtn" onclick="doLinkBank()">Verify &amp; Link Bank</button>
+  </div>
+</div>
+
+<div class="scr" id="scrHome">
+  <div class="topbar">
+    <div class="tl">
+      <div class="av" id="hAv">?</div>
+      <div>
+        <div class="tname" id="hName">&mdash;</div>
+        <div class="tsub" id="hSub">&mdash;</div>
+      </div>
+    </div>
+    <button class="logbtn" onclick="doLogout()" title="Sign out">&#9099;</button>
+  </div>
+
+  <div class="balcard">
+    <button class="refb" onclick="loadBal()" title="Refresh">&#8635;</button>
+    <div class="bal-l">Account Balance</div>
+    <div class="bal-a" id="bAmt">Rs. &mdash;</div>
+    <div class="bal-s" id="bSub">&mdash;</div>
+    <div class="bal-r">
+      <span class="chip" id="bAccId"></span>
+      <span class="chip" id="bBank"></span>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qab" onclick="goSend()">
+      <div class="qaic">&uarr;</div><div class="qalb">SEND</div>
+    </div>
+    <div class="qab" onclick="loadHistory()">
+      <div class="qaic">&darr;</div><div class="qalb">RECEIVE</div>
+    </div>
+    <div class="qab" onclick="goProfile()">
+      <div class="qaic">&#128100;</div><div class="qalb">PROFILE</div>
+    </div>
+  </div>
+
+  <div class="stitle">Recent Transactions</div>
+  <div class="txlist" id="txList">
+    <div class="txmt">No transactions yet.<br>Send your first payment.</div>
+  </div>
+</div>
+
+<div class="scr" id="scrSend">
+  <div class="scrh">
+    <button class="back" onclick="goHome()">&larr;</button>
+    <h2>Send Money</h2>
+  </div>
+  <div class="stitle" style="padding-top:14px">Pay To</div>
+  <div class="cpick" id="cpick" onclick="openFind()">
+    <div class="cpav" id="cpAv">&#128100;</div>
+    <div>
+      <div class="cpnm" id="cpNm">Select Recipient</div>
+      <div class="cpsb" id="cpSb">Enter mobile number to find</div>
+    </div>
+    <span style="color:var(--muted);font-size:18px;margin-left:auto">&rsaquo;</span>
+  </div>
+  <div class="amtcard">
+    <h3>Amount &amp; Note</h3>
+    <div class="amtrow">
+      <span class="amtrs">&#8377;</span>
+      <input type="number" class="amtinp" id="sAmt" placeholder="0" min="1" inputmode="decimal">
+    </div>
+    <input type="text" class="noteinp" id="sNote" placeholder="Add a note (optional)">
+  </div>
+  <div class="sact">
+    <button class="btn btn-p" id="sendBtn" onclick="doSend()">Send Payment</button>
+  </div>
+</div>
+
+<div class="scr" id="scrProfile">
+  <div class="scrh">
+    <button class="back" onclick="goHome()">&larr;</button>
+    <h2>Profile &amp; KYC</h2>
+  </div>
+  <div class="fbody">
+    <div class="field">
+      <div class="flbl">Name</div>
+      <div id="pName" style="font-size:16px;font-weight:600;padding:8px 0">&mdash;</div>
+    </div>
+    <div class="field">
+      <div class="flbl">Mobile</div>
+      <div id="pMobile" style="font-family:'JetBrains Mono',monospace;padding:8px 0">&mdash;</div>
+    </div>
+    <div class="field">
+      <div class="flbl">Bank</div>
+      <div id="pBank" style="padding:8px 0">&mdash;</div>
+    </div>
+    <div class="field">
+      <div class="flbl">Account</div>
+      <div id="pAccount" style="font-family:'JetBrains Mono',monospace;padding:8px 0">&mdash;</div>
+    </div>
+    <div class="field">
+      <div class="flbl">KYC Level</div>
+      <div id="pKyc" style="padding:8px 0">&mdash;</div>
+    </div>
+
+    <div class="stitle" style="padding:16px 0 8px">KYC Documents</div>
+    <div id="kycDocs"></div>
+
+    <div class="stitle" style="padding:16px 0 8px">Submit KYC Document</div>
+    <div class="err" id="kycErr"></div>
+    <div class="ok" id="kycOk"></div>
+    <div class="field">
+      <div class="flbl">Document Type</div>
+      <select class="fi select-fi" id="kycDocType">
+        <option value="PAN">PAN Card</option>
+        <option value="AADHAAR">Aadhaar Card</option>
+        <option value="PASSPORT">Passport</option>
+      </select>
+    </div>
+    <div class="field">
+      <div class="flbl">Document Number</div>
+      <input class="fi mono" type="text" id="kycDocNum" placeholder="e.g. ABCDE1234F" autocomplete="off">
+    </div>
+    <button class="btn btn-p" onclick="submitKyc()">Submit Document</button>
+
+    <button class="btn btn-r" style="margin-top:20px" onclick="doLogout()">Sign Out</button>
+  </div>
+</div>
+
+<div class="moverlay" id="findModal" onclick="closeFind()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>Find Recipient</h3>
+    <div class="field" style="margin-bottom:10px">
+      <div class="flbl">Mobile Number</div>
+      <input class="fi mono" type="tel" id="findMob" placeholder="9876543210" maxlength="10" inputmode="numeric" oninput="findUser()">
+    </div>
+    <div class="err" id="findErr" style="margin-bottom:10px"></div>
+    <div id="foundDiv" style="display:none">
+      <div class="fcard">
+        <div class="fav" id="fAv">?</div>
+        <div>
+          <div class="fnm" id="fNm"></div>
+          <div class="fsb" id="fSb"></div>
+        </div>
+      </div>
+      <button class="btn btn-g" onclick="pickRecipient()">Select This Person</button>
+    </div>
+    <button class="btn btn-o" style="margin-top:10px" onclick="closeFind()">Cancel</button>
+  </div>
+</div>
+
+<div class="rov" id="rov" onclick="closeResult()">
+  <div class="rsheet" onclick="event.stopPropagation()">
+    <div class="rico" id="rico"></div>
+    <div class="rtitle" id="rtitle"></div>
+    <div class="rsub" id="rsub"></div>
+    <div class="ramt" id="ramt"></div>
+    <div class="bupd" id="bupd"></div>
+    <div class="rdets" id="rdets"></div>
+    <div class="rsteps" id="rsteps"></div>
+    <button class="btn btn-p" onclick="closeResult()">Done</button>
+  </div>
+</div>
+
+<nav class="bnav">
+  <button class="ni on" data-tab="home" onclick="goHome()"><span class="ic">&#127968;</span>Home</button>
+  <button class="ni" data-tab="send" onclick="goSend()"><span class="ic">&uarr;</span>Send</button>
+  <button class="ni" data-tab="history" onclick="goHome();loadHistory()"><span class="ic">&#128203;</span>History</button>
+  <button class="ni" data-tab="profile" onclick="goProfile()"><span class="ic">&#128100;</span>Profile</button>
+</nav>
+
+</div>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
