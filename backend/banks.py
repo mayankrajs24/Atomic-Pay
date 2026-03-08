@@ -176,12 +176,15 @@ def start_bank_simulators():
         logger.info("Bank B simulator port 6002 already in use, reusing existing")
 
 
-async def call_bank(url: str, payload: dict, retries: int = 2) -> dict:
+async def call_bank(url: str, payload: dict, retries: int = 2, api_key: str = None) -> dict:
     last_error = None
+    headers = {}
+    if api_key:
+        headers["X-AtomicPay-Key"] = api_key
     for attempt in range(retries + 1):
         try:
             async with httpx.AsyncClient(timeout=GATEWAY_TIMEOUT) as client:
-                r = await client.post(url, json=payload)
+                r = await client.post(url, json=payload, headers=headers)
                 return r.json()
         except httpx.TimeoutException:
             last_error = "BANK_TIMEOUT"

@@ -64,6 +64,7 @@ backend/
   auth.py                  - JWT auth + PBKDF2 PIN hashing
   payments.py              - Two-phase atomic payment engine with idempotency
   banks.py                 - Bank simulators + async bank calls with retry
+  bank_connector.py        - Real bank onboarding lifecycle (register/approve/suspend/test/health)
   middleware.py             - RequestID, SecurityHeaders, RateLimit middleware
   fraud_detection.py       - Fraud scoring engine
   aml.py                   - Anti-money laundering checks
@@ -92,6 +93,13 @@ sdk/
 - POST /api/find_user - Search users
 - /api/kyc/* - KYC verification
 - /api/admin/* - Admin operations (requires admin role)
+- /api/admin/banks/register - Register a new real bank (generates API key + webhook secret)
+- /api/admin/banks/approve - Approve a pending bank (syncs to AVAILABLE_BANKS)
+- /api/admin/banks/suspend - Suspend an active bank
+- /api/admin/banks/test - Run connectivity tests against a bank
+- /api/admin/banks/health_check - Ping a bank and update health status
+- /api/admin/banks/regenerate_key - Regenerate a bank's API key
+- /api/admin/banks/registered - List all registered banks
 - /api/compliance/* - Compliance dashboard data
 - /api/regulatory/* - Regulatory reports
 
@@ -104,6 +112,15 @@ sdk/
 - PIN re-authentication required before every payment
 - Security headers on all responses
 - HMAC-SHA256 transaction signatures
+
+## Real Bank Onboarding
+- Banks register via admin dashboard or API (status=pending)
+- Admin approves bank (status=active) → `_sync_bank_to_available()` adds to AVAILABLE_BANKS
+- Bank model stores: api_key (apk_live_*), webhook_secret (whsec_*), environment, health_status
+- Startup calls `load_active_banks_from_db()` to restore approved banks into AVAILABLE_BANKS
+- Simulator banks (bank_a, bank_b) are NOT in DB — they remain via `start_bank_simulators()`
+- Admin can suspend/reactivate banks, regenerate API keys, run health checks and connectivity tests
+- All actions are audit-logged
 
 ## Demo Credentials
 - Ram: 9876543210 / 1234 (Bank A, account RAM_001)

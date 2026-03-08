@@ -95,7 +95,7 @@ async def execute_payment(db: Session, sender_mobile: str, receiver_mobile: str,
     debit = await call_bank(sb["url"], {
         "action": "DEBIT", "tx_id": tx_id,
         "account_id": sender.account_id, "amount": amount
-    })
+    }, api_key=sb.get("api_key"))
     elapsed = (time.monotonic() - t0) * 1000
 
     if debit.get("state") != 1:
@@ -119,7 +119,7 @@ async def execute_payment(db: Session, sender_mobile: str, receiver_mobile: str,
     credit = await call_bank(rb["url"], {
         "action": "CREDIT", "tx_id": tx_id,
         "account_id": receiver.account_id, "amount": amount
-    })
+    }, api_key=rb.get("api_key"))
     elapsed = (time.monotonic() - t0) * 1000
 
     if credit.get("state") != 1:
@@ -129,7 +129,7 @@ async def execute_payment(db: Session, sender_mobile: str, receiver_mobile: str,
         await call_bank(sb["url"], {
             "action": "UNLOCK", "tx_id": tx_id,
             "account_id": sender.account_id, "amount": amount
-        })
+        }, api_key=sb.get("api_key"))
         steps.append("  Rollback complete.")
         steps.append("State: -1 (Tamas REVERSED)")
         result = _seal(tx_id, -1, amount, sender, receiver, elapsed, reason, steps, note, fraud_score)

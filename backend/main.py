@@ -30,6 +30,11 @@ from backend.kyc import submit_kyc_document, verify_kyc_document
 from backend.monitoring import get_system_metrics
 from backend.compliance import log_audit
 from backend.middleware import RequestIdMiddleware, SecurityHeadersMiddleware, RateLimitMiddleware
+from backend.bank_connector import (
+    register_bank, approve_bank, suspend_bank, regenerate_api_key,
+    health_check_bank, test_bank_connection, load_active_banks_from_db,
+    get_all_registered_banks
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -158,17 +163,35 @@ class AMLActionRequest(BaseModel):
 
 
 class BankRegisterRequest(BaseModel):
-    name: str
-    bank_id: str
-    api_url: str
+    name: str = Field(..., min_length=2, max_length=200)
+    bank_id: str = Field(..., min_length=2, max_length=50, pattern=r"^[a-z0-9_]+$")
+    api_url: str = Field(..., min_length=5, max_length=500)
+    short_code: Optional[str] = Field(None, max_length=10)
     public_key: Optional[str] = None
     contact_email: Optional[str] = None
+    contact_name: Optional[str] = None
+    environment: Optional[str] = Field("sandbox", pattern=r"^(sandbox|production)$")
+    icon: Optional[str] = None
+    color: Optional[str] = None
+
+
+class BankActionRequest(BaseModel):
+    bank_id: str = Field(..., min_length=2, max_length=50)
+    reason: Optional[str] = Field(None, max_length=500)
 
 
 @app.on_event("startup")
 async def startup():
     init_db()
     start_bank_simulators()
+    from backend.database import SessionLocal
+    db = SessionLocal()
+    try:
+        load_active_banks_from_db(db)
+    except Exception as e:
+        logger.warning(f"Could not load banks from DB: {e}")
+    finally:
+        db.close()
     logger.info("Database initialized")
     logger.info(f"Gateway ready on port 5000 (production={IS_PRODUCTION})")
 
@@ -556,6 +579,83 @@ async def regulatory_transactions(user_data=Depends(get_current_user), db: Sessi
         "fraud_score": t.fraud_score, "signature": t.signature,
         "created_at": t.created_at.isoformat() if t.created_at else None
     } for t in txns]
+
+
+@app.post("/api/admin/banks/register")
+async def api_register_bank(req: BankRegisterRequest, request: Request,
+                            user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user_data, db)
+    result = register_bank(db, {
+        "bank_id": req.bank_id,
+        "name": req.name,
+        "short_code": req.short_code,
+        "api_url": req.api_url,
+        "public_key": req.public_key,
+        "contact_email": req.contact_email,
+        "contact_name": req.contact_name,
+        "environment": req.environment or "sandbox",
+        "icon": req.icon,
+        "color": req.color,
+    }, admin_mobile=user_data["sub"])
+    if not result["success"]:
+        raise HTTPException(400, result["reason"])
+    return result
+
+
+@app.post("/api/admin/banks/approve")
+async def api_approve_bank(req: BankActionRequest, request: Request,
+                           user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user_data, db)
+    result = approve_bank(db, req.bank_id, user_data["sub"])
+    if not result["success"]:
+        raise HTTPException(400, result["reason"])
+    return result
+
+
+@app.post("/api/admin/banks/suspend")
+async def api_suspend_bank(req: BankActionRequest, request: Request,
+                           user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user_data, db)
+    result = suspend_bank(db, req.bank_id, user_data["sub"], req.reason or "")
+    if not result["success"]:
+        raise HTTPException(400, result["reason"])
+    return result
+
+
+@app.post("/api/admin/banks/regenerate_key")
+async def api_regenerate_key(req: BankActionRequest, request: Request,
+                             user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user_data, db)
+    result = regenerate_api_key(db, req.bank_id, user_data["sub"])
+    if not result["success"]:
+        raise HTTPException(400, result["reason"])
+    return result
+
+
+@app.post("/api/admin/banks/health_check")
+async def api_bank_health_check(req: BankActionRequest,
+                                user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user_data, db)
+    result = await health_check_bank(db, req.bank_id)
+    if not result["success"]:
+        raise HTTPException(400, result["reason"])
+    return result
+
+
+@app.post("/api/admin/banks/test")
+async def api_test_bank(req: BankActionRequest,
+                        user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user_data, db)
+    result = await test_bank_connection(db, req.bank_id)
+    if not result["success"]:
+        raise HTTPException(400, result["reason"])
+    return result
+
+
+@app.get("/api/admin/banks/registered")
+async def api_registered_banks(user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user_data, db)
+    return get_all_registered_banks(db)
 
 
 @app.post("/api/admin/seed_demo")

@@ -80,11 +80,12 @@ body { display: block; }
   </div>
 
   <div class="tab-bar">
-    <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
-    <button class="tab-btn" onclick="switchTab('users')">Users</button>
-    <button class="tab-btn" onclick="switchTab('transactions')">Transactions</button>
-    <button class="tab-btn" onclick="switchTab('banks')">Banks</button>
-    <button class="tab-btn" onclick="switchTab('audit')">Audit Logs</button>
+    <button class="tab-btn active" onclick="switchTab('overview',this)">Overview</button>
+    <button class="tab-btn" onclick="switchTab('users',this)">Users</button>
+    <button class="tab-btn" onclick="switchTab('transactions',this)">Transactions</button>
+    <button class="tab-btn" onclick="switchTab('banks',this)">Banks</button>
+    <button class="tab-btn" onclick="switchTab('onboarding',this)">Bank Onboarding</button>
+    <button class="tab-btn" onclick="switchTab('audit',this)">Audit Logs</button>
   </div>
 
   <div class="tab-panel active" id="tab-overview">
@@ -122,6 +123,44 @@ body { display: block; }
     </div>
   </div>
 
+  <div class="tab-panel" id="tab-onboarding">
+    <div class="section">
+      <h2>Register New Bank</h2>
+      <div style="background:var(--card);border:1px solid var(--bdr);border-radius:var(--radius);padding:24px;margin-bottom:20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="field"><div class="flbl">Bank Name *</div><input class="fi" id="regBankName" placeholder="e.g. State Bank of India"></div>
+          <div class="field"><div class="flbl">Bank ID * (lowercase, no spaces)</div><input class="fi mono" id="regBankId" placeholder="e.g. sbi_main"></div>
+          <div class="field"><div class="flbl">API URL *</div><input class="fi mono" id="regBankUrl" placeholder="https://bank-api.example.com/atomicpay"></div>
+          <div class="field"><div class="flbl">Short Code</div><input class="fi" id="regBankShort" placeholder="e.g. SBI"></div>
+          <div class="field"><div class="flbl">Contact Name</div><input class="fi" id="regBankContact" placeholder="Technical Contact"></div>
+          <div class="field"><div class="flbl">Contact Email</div><input class="fi" id="regBankEmail" placeholder="tech@bank.com"></div>
+          <div class="field"><div class="flbl">Environment</div>
+            <select class="fi" id="regBankEnv"><option value="sandbox">Sandbox</option><option value="production">Production</option></select>
+          </div>
+          <div class="field"><div class="flbl">Color</div><input class="fi" id="regBankColor" placeholder="#3b7fff" value="#3b7fff"></div>
+        </div>
+        <div class="field" style="margin-top:12px"><div class="flbl">Public Key (optional, for mTLS/signature verification)</div><textarea class="fi" id="regBankPubKey" rows="3" style="font-family:'JetBrains Mono',monospace;font-size:12px" placeholder="-----BEGIN PUBLIC KEY-----"></textarea></div>
+        <div style="display:flex;gap:10px;margin-top:16px;align-items:center">
+          <button class="btn btn-p" onclick="registerNewBank()">Register Bank</button>
+          <span id="regBankMsg" style="font-size:13px;color:var(--muted)"></span>
+        </div>
+        <div id="regBankResult" style="display:none;margin-top:16px;padding:18px;background:var(--sur);border:1px solid var(--green);border-radius:var(--radius-sm)">
+          <div style="font-weight:700;color:var(--green);margin-bottom:10px">Bank Registered Successfully</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Share these credentials securely with the bank's technical team:</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;line-height:2;background:var(--bg);padding:14px;border-radius:8px;margin-top:8px">
+            <div>API Key: <span id="regResKey" style="color:var(--accent2)"></span></div>
+            <div>Webhook Secret: <span id="regResWebhook" style="color:var(--accent2)"></span></div>
+            <div>Status: <span id="regResStatus" style="color:var(--gold)"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <h2>Registered Banks</h2>
+      <div class="scroll-box"><table class="data-table" id="regBanksTable"><tr><td>Loading...</td></tr></table></div>
+    </div>
+  </div>
+
   <div class="tab-panel" id="tab-audit">
     <div class="section">
       <h2>Audit Trail</h2>
@@ -142,15 +181,16 @@ async function aapi(path, data, method) {
   return r.json();
 }
 
-function switchTab(tab) {
+function switchTab(tab, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelector(`#tab-${tab}`).classList.add('active');
-  event.target.classList.add('active');
+  if (btn) btn.classList.add('active');
   if (tab === 'overview') loadMetrics();
   if (tab === 'users') loadUsers();
   if (tab === 'transactions') loadTx();
   if (tab === 'banks') loadBankData();
+  if (tab === 'onboarding') loadRegisteredBanks();
   if (tab === 'audit') loadAudit();
 }
 
@@ -285,6 +325,84 @@ async function loadAudit() {
       </tr>`;
     });
   } catch(e) {}
+}
+
+async function registerNewBank() {
+  const msg = document.getElementById('regBankMsg');
+  const result = document.getElementById('regBankResult');
+  msg.textContent = 'Registering...'; msg.style.color = 'var(--muted)';
+  result.style.display = 'none';
+  try {
+    const data = await aapi('/admin/banks/register', {
+      name: document.getElementById('regBankName').value,
+      bank_id: document.getElementById('regBankId').value,
+      api_url: document.getElementById('regBankUrl').value,
+      short_code: document.getElementById('regBankShort').value || undefined,
+      contact_name: document.getElementById('regBankContact').value || undefined,
+      contact_email: document.getElementById('regBankEmail').value || undefined,
+      environment: document.getElementById('regBankEnv').value,
+      color: document.getElementById('regBankColor').value || undefined,
+      public_key: document.getElementById('regBankPubKey').value || undefined,
+    });
+    msg.textContent = '';
+    document.getElementById('regResKey').textContent = data.api_key;
+    document.getElementById('regResWebhook').textContent = data.webhook_secret;
+    document.getElementById('regResStatus').textContent = data.status;
+    result.style.display = 'block';
+    loadRegisteredBanks();
+  } catch (e) {
+    msg.textContent = e.message; msg.style.color = 'var(--red)';
+  }
+}
+
+async function loadRegisteredBanks() {
+  try {
+    const banks = await aapi('/admin/banks/registered');
+    const t = document.getElementById('regBanksTable');
+    t.innerHTML = '<tr><th>Bank ID</th><th>Name</th><th>Environment</th><th>Status</th><th>Health</th><th>API URL</th><th>Contact</th><th>Registered</th><th>Actions</th></tr>';
+    banks.forEach(b => {
+      const statusClass = b.status === 'active' ? 'sattva' : b.status === 'pending' ? 'rajas' : 'tamas';
+      const healthColor = b.health_status === 'healthy' ? 'var(--green)' : b.health_status === 'unreachable' ? 'var(--red)' : 'var(--muted)';
+      let actions = '';
+      if (b.status === 'pending') {
+        actions += `<button class="btn btn-p" style="font-size:11px;padding:4px 10px" onclick="bankAction('approve','${b.bank_id}')">Approve</button> `;
+      }
+      if (b.status === 'active') {
+        actions += `<button class="btn" style="font-size:11px;padding:4px 10px;border-color:var(--gold);color:var(--gold)" onclick="bankAction('suspend','${b.bank_id}')">Suspend</button> `;
+      }
+      if (b.status === 'suspended') {
+        actions += `<button class="btn btn-p" style="font-size:11px;padding:4px 10px" onclick="bankAction('approve','${b.bank_id}')">Reactivate</button> `;
+      }
+      actions += `<button class="btn" style="font-size:11px;padding:4px 10px" onclick="bankAction('health_check','${b.bank_id}')">Ping</button> `;
+      actions += `<button class="btn" style="font-size:11px;padding:4px 10px" onclick="bankAction('test','${b.bank_id}')">Test</button>`;
+      t.innerHTML += `<tr>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600">${b.bank_id}</td>
+        <td>${b.name}</td>
+        <td><span style="font-size:11px;padding:3px 8px;border-radius:8px;background:${b.environment==='production'?'var(--red-bg)':'var(--accent-glow)'};color:${b.environment==='production'?'var(--red)':'var(--accent2)'}">${b.environment}</span></td>
+        <td><span class="state-badge ${statusClass}">${b.status}</span></td>
+        <td style="color:${healthColor}">${b.health_status || 'unknown'}</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${b.api_url}">${b.api_url}</td>
+        <td style="font-size:12px">${b.contact_email||'\u2014'}</td>
+        <td style="font-size:11px;color:var(--muted)">${b.created_at ? new Date(b.created_at).toLocaleDateString() : ''}</td>
+        <td style="white-space:nowrap">${actions}</td>
+      </tr>`;
+    });
+  } catch(e) { console.error('Failed to load banks:', e); }
+}
+
+async function bankAction(action, bankId) {
+  try {
+    const data = await aapi(`/admin/banks/${action}`, { bank_id: bankId });
+    if (action === 'test') {
+      const passed = data.all_passed;
+      alert(`Connection Test: ${passed ? 'ALL PASSED' : 'SOME FAILED'}\n\n${Object.entries(data.tests).map(([k,v]) => `${k}: ${v.passed ? 'PASS' : 'FAIL'} - ${v.detail}`).join('\n')}`);
+    } else if (action === 'health_check') {
+      alert(`Health: ${data.health_status}\nChecked: ${data.checked_at}`);
+    }
+    loadRegisteredBanks();
+  } catch (e) {
+    alert('Action failed: ' + e.message);
+  }
 }
 
 if (ADMIN_TOKEN) {
