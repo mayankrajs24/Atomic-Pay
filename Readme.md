@@ -137,6 +137,30 @@ sdk/
 - httpx (async HTTP), jinja2 (templates)
 - pydantic (validation)
 
+
+## Installation
+
+Install all required dependencies using pip:
+
+```bash
+pip install fastapi uvicorn sqlalchemy psycopg2-binary python-jose httpx jinja2 pydantic python-dotenv
+```
+
+### Dependency Description
+
+| Package         | Purpose                                      |
+| --------------- | -------------------------------------------- |
+| fastapi         | Web framework for building the API           |
+| uvicorn         | ASGI server to run the FastAPI app           |
+| sqlalchemy      | ORM for database interactions                |
+| psycopg2-binary | PostgreSQL database driver                   |
+| python-jose     | JWT authentication handling                  |
+| httpx           | Async HTTP client for API calls              |
+| jinja2          | Template rendering engine                    |
+| pydantic        | Data validation and schemas                  |
+| python-dotenv   | Load environment variables from `.env` files |
+
+
 ## Run Command
 ```
 python main.py

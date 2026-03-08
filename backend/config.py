@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///atomicpay.db")
 SESSION_SECRET = os.environ["SESSION_SECRET"]
