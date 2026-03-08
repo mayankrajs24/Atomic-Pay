@@ -160,6 +160,37 @@ pip install fastapi uvicorn sqlalchemy psycopg2-binary python-jose httpx jinja2 
 | pydantic        | Data validation and schemas                  |
 | python-dotenv   | Load environment variables from `.env` files |
 
+## Environment Variables
+
+Create a `.env` file in the root of the backend directory.
+
+Example `.env` configuration:
+
+```
+DATABASE_URL=postgresql://postgres:Pass%40123@localhost:5432/atomicpay
+SESSION_SECRET=your_super_secret_key
+REPL_DEPLOYMENT=0
+```
+
+### Variable Description
+
+| Variable        | Description                                              |
+| --------------- | -------------------------------------------------------- |
+| DATABASE_URL    | PostgreSQL database connection string                    |
+| SESSION_SECRET  | Secret key used for JWT and session security             |
+| REPL_DEPLOYMENT | Set to `1` when running in Replit production environment |
+
+### Notes
+
+* If your database password contains special characters like `@`, it must be URL encoded.
+* Example: `Pass@123` → `Pass%40123`.
+* Ensure the PostgreSQL database (`atomicpay`) exists before running the application.
+
+### Run the Server
+
+```
+uvicorn main:app --reload
+```
 
 ## Run Command
 ```
