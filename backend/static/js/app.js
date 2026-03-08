@@ -409,8 +409,7 @@ function showResult(r) {
   if (r.new_sender_bal !== null && r.new_sender_bal !== undefined) {
     bupd += `<div class="bucard"><div class="bunm">Your Balance</div><div class="bubal">${formatCurrency(r.new_sender_bal)}</div></div>`;
   }
-  if (r.new_receiver_bal !== null && r.new_receiver_bal !== undefined) {
-    bupd += `<div class="bucard"><div class="bunm">${r.receiver_name}'s Balance</div><div class="bubal">${formatCurrency(r.new_receiver_bal)}</div></div>`;
+  if (false) {
   }
   $('bupd').innerHTML = bupd;
 

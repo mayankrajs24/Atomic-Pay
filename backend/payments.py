@@ -139,7 +139,7 @@ async def execute_payment(db: Session, sender_mobile: str, receiver_mobile: str,
         return result
 
     nrb = credit.get("new_balance")
-    steps.append(f"  Confirmed. {receiver.name} balance: Rs.{nrb:,.0f}")
+    steps.append(f"  Confirmed. {receiver.name} credited successfully.")
     elapsed = (time.monotonic() - t0) * 1000
     steps.append("-" * 42)
     steps.append("Phase 2 COMMIT \u2014 Both banks confirmed")
@@ -147,7 +147,7 @@ async def execute_payment(db: Session, sender_mobile: str, receiver_mobile: str,
     steps.append("State: +1 (Sattva COMPLETED)")
 
     result = _seal(tx_id, 1, amount, sender, receiver, elapsed, "COMPLETED", steps, note, fraud_score,
-                   new_sender_bal=nsb, new_receiver_bal=nrb)
+                   new_sender_bal=nsb)
     _save_tx(db, result, sender, receiver, idempotency_key)
     check_aml_rules(db, sender, result)
     log_audit(db, "PAYMENT_COMPLETED", sender.mobile, f"tx={tx_id[:8]} amt={amount} to={receiver.mobile}")
