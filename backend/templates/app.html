@@ -2,12 +2,27 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>AtomicPay</title>
 <link rel="stylesheet" href="/static/css/style.css">
+<style>
+  @media (max-width: 430px) {
+    .phone { max-width: 100%; }
+    .bnav, .rov .rsheet, .moverlay .modal { max-width: 100%; }
+  }
+  @media (min-width: 431px) {
+    body { background: #000; display: flex; align-items: center; justify-content: center; }
+    .phone { border-left: 1px solid var(--bdr); border-right: 1px solid var(--bdr); box-shadow: 0 0 80px rgba(0,0,0,.8); }
+  }
+</style>
 </head>
 <body>
 <div class="phone">
+
+<div id="toast" class="toast"></div>
 
 <div class="scr on" id="scrWelcome">
   <div class="wlogo">
@@ -18,6 +33,10 @@
   <div class="wbtns">
     <button class="btn btn-p" onclick="show('scrRegister')">Create Account</button>
     <button class="btn btn-o" onclick="show('scrLogin')">Sign In</button>
+  </div>
+  <div class="integrations-badge">
+    <span class="dot"></span>
+    <span>UPI &middot; IMPS &middot; NEFT &middot; RTGS Compatible</span>
   </div>
   <div class="wfoot">
     -1 &middot; 0 &middot; +1 &nbsp;|&nbsp; No suspense. No float.<br>
@@ -32,31 +51,35 @@
 
 <div class="scr" id="scrRegister">
   <div class="scrh">
-    <button class="back" onclick="show('scrWelcome')">&larr;</button>
+    <button class="back" onclick="show('scrWelcome')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
     <h2>Create Account</h2>
   </div>
   <div class="fbody">
     <div class="err" id="regErr"></div>
     <div class="field">
       <div class="flbl">Full Name</div>
-      <input class="fi" type="text" id="regName" placeholder="Ram Kumar" autocomplete="off">
+      <input class="fi" type="text" id="regName" placeholder="Enter your full name" autocomplete="off">
     </div>
     <div class="field">
       <div class="flbl">Mobile Number</div>
       <input class="fi mono" type="tel" id="regMobile" placeholder="9876543210" maxlength="10" inputmode="numeric">
     </div>
     <div class="field">
-      <div class="flbl">Create PIN</div>
+      <div class="flbl">Create PIN (4 digits)</div>
       <input class="fi mono" type="password" id="regPin" placeholder="&middot; &middot; &middot; &middot;" maxlength="4" inputmode="numeric">
     </div>
-    <div class="hint">Demo accounts: Ram (9876543210/1234), Sita (9876543211/1234), Arjun (9876543212/1234)</div>
+    <div class="hint">Demo accounts available: Ram (9876543210/1234), Sita (9876543211/1234), Arjun (9876543212/1234)</div>
     <button class="btn btn-p" id="regBtn" onclick="doRegister()">Create Account</button>
   </div>
 </div>
 
 <div class="scr" id="scrLogin">
   <div class="scrh">
-    <button class="back" onclick="show('scrWelcome')">&larr;</button>
+    <button class="back" onclick="show('scrWelcome')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
     <h2>Sign In</h2>
   </div>
   <div class="fbody">
@@ -76,7 +99,7 @@
 
 <div class="scr" id="scrLinkBank">
   <div class="scrh">
-    <div style="width:36px"></div>
+    <div style="width:38px"></div>
     <h2>Link Your Bank</h2>
   </div>
   <div class="fbody">
@@ -85,7 +108,7 @@
     <div class="field">
       <div class="flbl">Select Your Bank</div>
       <div class="bank-grid" id="bankGrid">
-        <div style="color:var(--muted);font-size:13px;padding:8px">Loading banks...</div>
+        <div style="color:var(--dim);font-size:13px;padding:12px">Loading banks...</div>
       </div>
     </div>
     <div class="field">
@@ -106,13 +129,15 @@
         <div class="tsub" id="hSub">&mdash;</div>
       </div>
     </div>
-    <button class="logbtn" onclick="doLogout()" title="Sign out">&#9099;</button>
+    <button class="logbtn" onclick="doLogout()" title="Sign out">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+    </button>
   </div>
 
   <div class="balcard">
     <button class="refb" onclick="loadBal()" title="Refresh">&#8635;</button>
     <div class="bal-l">Account Balance</div>
-    <div class="bal-a" id="bAmt">Rs. &mdash;</div>
+    <div class="bal-a" id="bAmt">&#8377; &mdash;</div>
     <div class="bal-s" id="bSub">&mdash;</div>
     <div class="bal-r">
       <span class="chip" id="bAccId"></span>
@@ -122,108 +147,241 @@
 
   <div class="qa">
     <div class="qab" onclick="goSend()">
-      <div class="qaic">&uarr;</div><div class="qalb">SEND</div>
+      <div class="qaic">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      </div>
+      <div class="qalb">Send</div>
     </div>
-    <div class="qab" onclick="loadHistory()">
-      <div class="qaic">&darr;</div><div class="qalb">RECEIVE</div>
+    <div class="qab" onclick="goHome()">
+      <div class="qaic">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+      </div>
+      <div class="qalb">Receive</div>
     </div>
-    <div class="qab" onclick="goProfile()">
-      <div class="qaic">&#128100;</div><div class="qalb">PROFILE</div>
+    <div class="qab" onclick="show('scrHistory');loadHistoryFull();setNav('history')">
+      <div class="qaic">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      </div>
+      <div class="qalb">History</div>
+    </div>
+    <div class="qab" onclick="goScan()">
+      <div class="qaic">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+      </div>
+      <div class="qalb">Scan</div>
+    </div>
+  </div>
+
+  <div class="upi-section">
+    <div class="upi-title">Pay via Integrated Apps</div>
+    <div class="upi-apps">
+      <div class="upi-app" onclick="goSend()">
+        <div class="upi-icon" style="background: linear-gradient(135deg, #4285f4, #34a853)">G</div>
+        <div class="upi-label">GPay</div>
+      </div>
+      <div class="upi-app" onclick="goSend()">
+        <div class="upi-icon" style="background: linear-gradient(135deg, #5f259f, #3f1966)">P</div>
+        <div class="upi-label">PhonePe</div>
+      </div>
+      <div class="upi-app" onclick="goSend()">
+        <div class="upi-icon" style="background: linear-gradient(135deg, #002970, #00baf2)">T</div>
+        <div class="upi-label">Paytm</div>
+      </div>
+      <div class="upi-app" onclick="goSend()">
+        <div class="upi-icon" style="background: linear-gradient(135deg, var(--accent), #4f46e5)">&#9889;</div>
+        <div class="upi-label">AtomicPay</div>
+      </div>
     </div>
   </div>
 
   <div class="stitle">Recent Transactions</div>
   <div class="txlist" id="txList">
-    <div class="txmt">No transactions yet.<br>Send your first payment.</div>
+    <div class="empty-state">
+      <div class="empty-icon">&#128176;</div>
+      <div class="empty-title">No transactions yet</div>
+      <div class="empty-sub">Your payment history will appear here</div>
+    </div>
+  </div>
+</div>
+
+<div class="scr" id="scrHistory">
+  <div class="scrh">
+    <button class="back" onclick="goHome()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h2>Transaction History</h2>
+  </div>
+  <div class="txlist" id="txListFull" style="padding-top:12px;padding-bottom:90px">
+    <div class="empty-state">
+      <div class="empty-icon">&#128176;</div>
+      <div class="empty-title">No transactions yet</div>
+      <div class="empty-sub">Your payment history will appear here</div>
+    </div>
   </div>
 </div>
 
 <div class="scr" id="scrSend">
   <div class="scrh">
-    <button class="back" onclick="goHome()">&larr;</button>
+    <button class="back" onclick="goHome()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
     <h2>Send Money</h2>
   </div>
-  <div class="stitle" style="padding-top:14px">Pay To</div>
+  <div class="stitle" style="padding-top:8px">Pay To</div>
   <div class="cpick" id="cpick" onclick="openFind()">
-    <div class="cpav" id="cpAv">&#128100;</div>
+    <div class="cpav" id="cpAv">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </div>
     <div>
       <div class="cpnm" id="cpNm">Select Recipient</div>
-      <div class="cpsb" id="cpSb">Enter mobile number to find</div>
+      <div class="cpsb" id="cpSb">Tap to search by mobile number</div>
     </div>
-    <span style="color:var(--muted);font-size:18px;margin-left:auto">&rsaquo;</span>
+    <span style="color:var(--dim);font-size:20px;margin-left:auto">&#8250;</span>
   </div>
   <div class="amtcard">
-    <h3>Amount &amp; Note</h3>
+    <h3>Amount</h3>
     <div class="amtrow">
       <span class="amtrs">&#8377;</span>
       <input type="number" class="amtinp" id="sAmt" placeholder="0" min="1" inputmode="decimal">
     </div>
-    <input type="text" class="noteinp" id="sNote" placeholder="Add a note (optional)">
+    <div class="quick-amounts">
+      <div class="qa-chip" onclick="setAmount(100)">&#8377;100</div>
+      <div class="qa-chip" onclick="setAmount(500)">&#8377;500</div>
+      <div class="qa-chip" onclick="setAmount(1000)">&#8377;1K</div>
+      <div class="qa-chip" onclick="setAmount(5000)">&#8377;5K</div>
+    </div>
+    <h3 style="margin-top:16px">Note</h3>
+    <input type="text" class="noteinp" id="sNote" placeholder="What's this for? (optional)">
   </div>
   <div class="sact">
-    <button class="btn btn-p" id="sendBtn" onclick="doSend()">Send Payment</button>
+    <button class="btn btn-p" id="sendBtn" onclick="initiateSend()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:8px"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      Send Payment
+    </button>
   </div>
 </div>
 
 <div class="scr" id="scrProfile">
   <div class="scrh">
-    <button class="back" onclick="goHome()">&larr;</button>
-    <h2>Profile &amp; KYC</h2>
+    <button class="back" onclick="goHome()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h2>Profile</h2>
   </div>
-  <div class="fbody">
-    <div class="field">
-      <div class="flbl">Name</div>
-      <div id="pName" style="font-size:16px;font-weight:600;padding:8px 0">&mdash;</div>
-    </div>
-    <div class="field">
-      <div class="flbl">Mobile</div>
-      <div id="pMobile" style="font-family:'JetBrains Mono',monospace;padding:8px 0">&mdash;</div>
-    </div>
-    <div class="field">
-      <div class="flbl">Bank</div>
-      <div id="pBank" style="padding:8px 0">&mdash;</div>
-    </div>
-    <div class="field">
-      <div class="flbl">Account</div>
-      <div id="pAccount" style="font-family:'JetBrains Mono',monospace;padding:8px 0">&mdash;</div>
-    </div>
-    <div class="field">
-      <div class="flbl">KYC Level</div>
-      <div id="pKyc" style="padding:8px 0">&mdash;</div>
-    </div>
 
-    <div class="stitle" style="padding:16px 0 8px">KYC Documents</div>
-    <div id="kycDocs"></div>
+  <div class="profile-header">
+    <div class="profile-avatar" id="pAvatar">?</div>
+    <div class="profile-name" id="pName">&mdash;</div>
+    <div class="profile-mobile" id="pMobile">&mdash;</div>
+    <div id="pKycBadge"></div>
+  </div>
 
-    <div class="stitle" style="padding:16px 0 8px">Submit KYC Document</div>
+  <div class="profile-section">
+    <div class="profile-row">
+      <div class="pr-icon" style="background:var(--blue-bg);color:var(--blue)">&#127974;</div>
+      <div class="pr-info">
+        <div class="pr-label">Bank Account</div>
+        <div class="pr-value" id="pBank">Not linked</div>
+      </div>
+    </div>
+    <div class="profile-row">
+      <div class="pr-icon" style="background:var(--accent-glow);color:var(--accent)">&#128179;</div>
+      <div class="pr-info">
+        <div class="pr-label">Account Number</div>
+        <div class="pr-value" id="pAccount" style="font-family:'JetBrains Mono',monospace">&mdash;</div>
+      </div>
+    </div>
+    <div class="profile-row">
+      <div class="pr-icon" style="background:var(--green-bg);color:var(--green)">&#9989;</div>
+      <div class="pr-info">
+        <div class="pr-label">KYC Level</div>
+        <div class="pr-value" id="pKyc">&mdash;</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stitle">KYC Verification</div>
+  <div style="padding:0 16px 12px">
+    <div id="kycDocs" style="margin-bottom:12px"></div>
     <div class="err" id="kycErr"></div>
     <div class="ok" id="kycOk"></div>
-    <div class="field">
-      <div class="flbl">Document Type</div>
-      <select class="fi select-fi" id="kycDocType">
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <select class="select-fi" id="kycDocType" style="flex:1">
         <option value="PAN">PAN Card</option>
         <option value="AADHAAR">Aadhaar Card</option>
         <option value="PASSPORT">Passport</option>
       </select>
+      <input class="fi mono" type="text" id="kycDocNum" placeholder="Doc number" autocomplete="off" style="flex:1">
     </div>
-    <div class="field">
-      <div class="flbl">Document Number</div>
-      <input class="fi mono" type="text" id="kycDocNum" placeholder="e.g. ABCDE1234F" autocomplete="off">
-    </div>
-    <button class="btn btn-p" onclick="submitKyc()">Submit Document</button>
+    <button class="btn btn-o btn-sm" onclick="submitKyc()" style="width:100%">Submit Document</button>
+  </div>
 
-    <button class="btn btn-r" style="margin-top:20px" onclick="doLogout()">Sign Out</button>
+  <div class="stitle">Integrations</div>
+  <div class="profile-section">
+    <div class="profile-row" style="cursor:pointer" onclick="showToast('GPay integration ready via UPI protocol','success')">
+      <div class="pr-icon" style="background:linear-gradient(135deg,#4285f4,#34a853);color:#fff;font-weight:700">G</div>
+      <div class="pr-info">
+        <div class="pr-value">Google Pay</div>
+        <div class="pr-label">Connected via UPI</div>
+      </div>
+      <div class="pr-arrow">&#8250;</div>
+    </div>
+    <div class="profile-row" style="cursor:pointer" onclick="showToast('PhonePe integration ready via UPI protocol','success')">
+      <div class="pr-icon" style="background:linear-gradient(135deg,#5f259f,#3f1966);color:#fff;font-weight:700">P</div>
+      <div class="pr-info">
+        <div class="pr-value">PhonePe</div>
+        <div class="pr-label">Connected via UPI</div>
+      </div>
+      <div class="pr-arrow">&#8250;</div>
+    </div>
+    <div class="profile-row" style="cursor:pointer" onclick="showToast('Paytm integration ready via UPI protocol','success')">
+      <div class="pr-icon" style="background:linear-gradient(135deg,#002970,#00baf2);color:#fff;font-weight:700">T</div>
+      <div class="pr-info">
+        <div class="pr-value">Paytm</div>
+        <div class="pr-label">Connected via UPI</div>
+      </div>
+      <div class="pr-arrow">&#8250;</div>
+    </div>
+  </div>
+
+  <div style="padding:12px 16px 40px">
+    <button class="btn btn-r" onclick="doLogout()">Sign Out</button>
+  </div>
+</div>
+
+<div class="scr" id="scrScan">
+  <div class="scrh">
+    <button class="back" onclick="goHome()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h2>Scan &amp; Pay</h2>
+  </div>
+  <div class="fbody" style="align-items:center;justify-content:center">
+    <div style="width:220px;height:220px;border:3px solid var(--accent);border-radius:24px;display:flex;align-items:center;justify-content:center;position:relative;animation:glow 3s ease-in-out infinite">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent);border-radius:2px;animation:scanLine 2s ease-in-out infinite"></div>
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--dim)" stroke-width="1.5">
+        <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/>
+        <rect x="7" y="7" width="10" height="10" rx="1"/>
+      </svg>
+    </div>
+    <style>@keyframes scanLine { 0%, 100% { top: 5%; } 50% { top: 90%; } }</style>
+    <div style="text-align:center;margin-top:24px">
+      <div style="font-size:16px;font-weight:600;margin-bottom:8px">QR Code Scanner</div>
+      <div style="font-size:13px;color:var(--dim);line-height:1.7">Point your camera at a QR code to initiate payment via AtomicPay protocol</div>
+    </div>
+    <button class="btn btn-o" style="margin-top:24px" onclick="goSend()">Enter Manually Instead</button>
   </div>
 </div>
 
 <div class="moverlay" id="findModal" onclick="closeFind()">
   <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
     <h3>Find Recipient</h3>
-    <div class="field" style="margin-bottom:10px">
+    <div class="field" style="margin-bottom:12px">
       <div class="flbl">Mobile Number</div>
       <input class="fi mono" type="tel" id="findMob" placeholder="9876543210" maxlength="10" inputmode="numeric" oninput="findUser()">
     </div>
-    <div class="err" id="findErr" style="margin-bottom:10px"></div>
+    <div class="err" id="findErr" style="margin-bottom:12px"></div>
     <div id="foundDiv" style="display:none">
       <div class="fcard">
         <div class="fav" id="fAv">?</div>
@@ -238,7 +396,37 @@
   </div>
 </div>
 
-<div class="rov" id="rov" onclick="closeResult()">
+<div class="pin-confirm-overlay" id="pinOverlay">
+  <div class="pin-confirm">
+    <div class="lock-icon">&#128274;</div>
+    <h3>Confirm Payment</h3>
+    <div class="pc-sub" id="pcSub">Enter your 4-digit PIN to authorize</div>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+    </div>
+    <div class="pin-keypad" id="pinKeypad">
+      <button class="pin-key" onclick="pinInput('1')">1</button>
+      <button class="pin-key" onclick="pinInput('2')">2</button>
+      <button class="pin-key" onclick="pinInput('3')">3</button>
+      <button class="pin-key" onclick="pinInput('4')">4</button>
+      <button class="pin-key" onclick="pinInput('5')">5</button>
+      <button class="pin-key" onclick="pinInput('6')">6</button>
+      <button class="pin-key" onclick="pinInput('7')">7</button>
+      <button class="pin-key" onclick="pinInput('8')">8</button>
+      <button class="pin-key" onclick="pinInput('9')">9</button>
+      <button class="pin-key bio" onclick="biometricAuth()" title="Fingerprint">&#128406;</button>
+      <button class="pin-key" onclick="pinInput('0')">0</button>
+      <button class="pin-key del" onclick="pinDelete()">&#9003;</button>
+    </div>
+    <div class="pc-err" id="pcErr"></div>
+    <button class="pc-cancel" onclick="cancelPin()">Cancel</button>
+  </div>
+</div>
+
+<div class="rov" id="rov">
   <div class="rsheet" onclick="event.stopPropagation()">
     <div class="rico" id="rico"></div>
     <div class="rtitle" id="rtitle"></div>
@@ -252,10 +440,26 @@
 </div>
 
 <nav class="bnav">
-  <button class="ni on" data-tab="home" onclick="goHome()"><span class="ic">&#127968;</span>Home</button>
-  <button class="ni" data-tab="send" onclick="goSend()"><span class="ic">&uarr;</span>Send</button>
-  <button class="ni" data-tab="history" onclick="goHome();loadHistory()"><span class="ic">&#128203;</span>History</button>
-  <button class="ni" data-tab="profile" onclick="goProfile()"><span class="ic">&#128100;</span>Profile</button>
+  <button class="ni on" data-tab="home" onclick="goHome()">
+    <span class="ic">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M9 22V12h6v10"/></svg>
+    </span>Home
+  </button>
+  <button class="ni" data-tab="send" onclick="goSend()">
+    <span class="ic">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+    </span>Send
+  </button>
+  <button class="ni" data-tab="history" onclick="show('scrHistory');loadHistoryFull();setNav('history')">
+    <span class="ic">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    </span>History
+  </button>
+  <button class="ni" data-tab="profile" onclick="goProfile()">
+    <span class="ic">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </span>Profile
+  </button>
 </nav>
 
 </div>

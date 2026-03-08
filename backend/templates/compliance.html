@@ -7,47 +7,51 @@
 <link rel="stylesheet" href="/static/css/style.css">
 <style>
 body { display: block; }
-.dashboard { max-width: 1200px; margin: 0 auto; padding: 20px; }
-.dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--bdr); }
-.dash-header h1 { font-size: 22px; font-weight: 800; }
-.dash-header h1 span { color: var(--gold); }
+.dashboard { max-width: 1280px; margin: 0 auto; padding: 24px; }
+.dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--bdr); }
+.dash-header h1 { font-size: 24px; font-weight: 800; display: flex; align-items: center; gap: 10px; letter-spacing: -.02em; }
+.dash-header h1 span { font-size: 28px; }
 .dash-nav { display: flex; gap: 8px; flex-wrap: wrap; }
-.dash-nav a { color: var(--muted); text-decoration: none; font-size: 12px; padding: 6px 12px; border: 1px solid var(--bdr); border-radius: 8px; }
-.dash-nav a:hover { color: var(--accent); border-color: var(--accent); }
-.section { margin-bottom: 24px; }
-.section h2 { font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: .5px; margin-bottom: 12px; text-transform: uppercase; }
-.data-table { width: 100%; border-collapse: collapse; background: var(--sur); border-radius: 12px; overflow: hidden; }
-.data-table th { background: var(--card); color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 10px 14px; text-align: left; }
-.data-table td { padding: 10px 14px; font-size: 13px; border-top: 1px solid var(--bdr); }
+.dash-nav a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 8px 16px; border: 1px solid var(--bdr); border-radius: 20px; transition: all .2s; }
+.dash-nav a:hover { color: var(--accent2); border-color: var(--accent); }
+.section { margin-bottom: 28px; }
+.section h2 { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: .05em; margin-bottom: 14px; text-transform: uppercase; }
+.data-table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--bdr); }
+.data-table th { background: var(--sur); color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 12px 16px; text-align: left; }
+.data-table td { padding: 12px 16px; font-size: 13px; border-top: 1px solid var(--bdr); }
+.data-table tr:hover td { background: rgba(99,102,241,.02); }
 .scroll-box { max-height: 400px; overflow-y: auto; }
-.tab-bar { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
-.tab-btn { padding: 8px 16px; border: 1px solid var(--bdr); border-radius: 8px; background: var(--sur); color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; }
-.tab-btn.active { background: var(--gold); color: #000; border-color: var(--gold); }
-.tab-panel { display: none; }
+.scroll-box::-webkit-scrollbar { width: 4px; }
+.scroll-box::-webkit-scrollbar-thumb { background: var(--bdr2); border-radius: 2px; }
+.tab-bar { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+.tab-btn { padding: 10px 20px; border: 1px solid var(--bdr); border-radius: 12px; background: var(--card); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; font-family: 'Inter', sans-serif; }
+.tab-btn:hover { border-color: var(--bdr2); color: var(--txt); }
+.tab-btn.active { background: linear-gradient(135deg, var(--gold), #d97706); color: #000; border-color: var(--gold); box-shadow: 0 4px 12px rgba(245,158,11,.3); }
+.tab-panel { display: none; animation: screenIn .3s ease; }
 .tab-panel.active { display: block; }
-.action-btn { padding: 4px 10px; border: 1px solid var(--bdr); border-radius: 6px; background: var(--sur); color: var(--txt); font-size: 11px; cursor: pointer; margin-right: 4px; }
+.action-btn { padding: 6px 14px; border: 1px solid var(--bdr); border-radius: var(--radius-xs); background: var(--card); color: var(--txt); font-size: 12px; font-weight: 500; cursor: pointer; margin-right: 6px; transition: all .2s; font-family: 'Inter', sans-serif; }
 .action-btn:hover { border-color: var(--accent); }
-.action-btn.approve { color: var(--green); border-color: var(--green); }
-.action-btn.reject { color: var(--red); border-color: var(--red); }
+.action-btn.approve { color: var(--green); border-color: rgba(34,197,94,.3); background: var(--green-bg); }
+.action-btn.approve:hover { background: rgba(34,197,94,.15); }
+.action-btn.reject { color: var(--red); border-color: rgba(239,68,68,.3); background: var(--red-bg); }
+.action-btn.reject:hover { background: rgba(239,68,68,.15); }
 .risk-high { color: var(--red); font-weight: 700; }
 .risk-med { color: var(--gold); font-weight: 700; }
 .risk-low { color: var(--green); }
-.status-open { color: var(--gold); }
-.status-resolved { color: var(--green); }
-.status-dismissed { color: var(--muted); }
-.report-card { background: var(--sur); border: 1px solid var(--bdr); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
-.report-card h3 { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 12px; }
-.report-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--bdr); }
+.report-card { background: var(--card); border: 1px solid var(--bdr); border-radius: var(--radius); padding: 24px; margin-bottom: 18px; }
+.report-card h3 { font-size: 16px; font-weight: 700; color: var(--accent2); margin-bottom: 16px; }
+.report-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 14px; border-bottom: 1px solid var(--bdr); }
 .report-label { color: var(--muted); }
-.report-value { font-family: 'JetBrains Mono', monospace; }
-.login-card { max-width: 400px; margin: 100px auto; padding: 32px; background: var(--sur); border: 1px solid var(--bdr); border-radius: 16px; }
-.login-card h2 { text-align: center; margin-bottom: 20px; }
+.report-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+.login-card { max-width: 400px; margin: 80px auto; padding: 36px; background: var(--card); border: 1px solid var(--bdr); border-radius: 20px; box-shadow: var(--shadow-lg); }
+.login-card h2 { text-align: center; margin-bottom: 24px; font-size: 20px; font-weight: 700; }
 </style>
 </head>
 <body>
 <div class="dashboard" id="loginView">
   <div class="login-card">
-    <h2>Compliance Login</h2>
+    <div style="text-align:center;font-size:36px;margin-bottom:12px">&#128737;</div>
+    <h2>Compliance Dashboard</h2>
     <div class="err" id="cErr"></div>
     <div class="fbody" style="padding:0">
       <div class="field">
@@ -70,7 +74,7 @@ body { display: block; }
       <a href="/">App</a>
       <a href="/admin">Admin</a>
       <a href="/developer">Developer</a>
-      <a href="#" onclick="cLogout()">Logout</a>
+      <a href="#" onclick="cLogout()" style="color:var(--red);border-color:rgba(239,68,68,.2)">Logout</a>
     </div>
   </div>
 
@@ -83,14 +87,14 @@ body { display: block; }
 
   <div class="tab-panel active" id="tab-aml">
     <div class="section">
-      <h2>AML Alerts</h2>
+      <h2>Anti-Money Laundering Alerts</h2>
       <div class="scroll-box"><table class="data-table" id="amlTable"><tr><td>Loading...</td></tr></table></div>
     </div>
   </div>
 
   <div class="tab-panel" id="tab-fraud">
     <div class="section">
-      <h2>Fraud Flags</h2>
+      <h2>Fraud Detection Flags</h2>
       <div class="scroll-box"><table class="data-table" id="fraudTable"><tr><td>Loading...</td></tr></table></div>
     </div>
   </div>
@@ -141,7 +145,7 @@ async function cLogin() {
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || 'Failed');
-    if (data.role !== 'admin') throw new Error('Admin required');
+    if (data.role !== 'admin') throw new Error('Admin access required');
     CT = data.token; localStorage.setItem('ap_comp_token', CT); showDash();
   } catch (e) {
     const err = document.getElementById('cErr'); err.textContent = e.message; err.style.display = 'block';
@@ -163,14 +167,16 @@ async function loadAML() {
     const alerts = await capi('/compliance/aml_alerts');
     const t = document.getElementById('amlTable');
     t.innerHTML = '<tr><th>ID</th><th>User</th><th>TX</th><th>Risk</th><th>Reason</th><th>Status</th><th>Actions</th></tr>';
-    if (!alerts.length) { t.innerHTML += '<tr><td colspan="7" style="color:var(--green);text-align:center">No AML alerts</td></tr>'; return; }
+    if (!alerts.length) { t.innerHTML += '<tr><td colspan="7" style="color:var(--green);text-align:center;padding:24px">No AML alerts \u2014 All clear</td></tr>'; return; }
     alerts.forEach(a => {
+      const statusClass = a.status === 'open' ? 'rajas' : a.status === 'resolved' ? 'sattva' : 'tamas';
       t.innerHTML += `<tr>
-        <td>#${a.id}</td><td>User ${a.user_id}</td>
-        <td style="font-family:monospace;font-size:11px">${(a.tx_id||'').substring(0,8)}</td>
+        <td style="font-weight:600">#${a.id}</td>
+        <td>User ${a.user_id}</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${(a.tx_id||'').substring(0,8)}</td>
         <td class="${riskClass(a.risk_score)}">${a.risk_score}</td>
-        <td style="font-size:11px">${a.reason}</td>
-        <td class="status-${a.status}">${a.status}</td>
+        <td style="font-size:12px">${a.reason}</td>
+        <td><span class="state-badge ${statusClass}">${a.status}</span></td>
         <td>${a.status === 'open' ? `<button class="action-btn approve" onclick="amlAction(${a.id},'resolved')">Resolve</button><button class="action-btn reject" onclick="amlAction(${a.id},'dismissed')">Dismiss</button>` : ''}</td>
       </tr>`;
     });
@@ -186,14 +192,15 @@ async function loadFraud() {
     const flags = await capi('/compliance/fraud_flags');
     const t = document.getElementById('fraudTable');
     t.innerHTML = '<tr><th>ID</th><th>User</th><th>TX</th><th>Risk Score</th><th>Type</th><th>Time</th></tr>';
-    if (!flags.length) { t.innerHTML += '<tr><td colspan="6" style="color:var(--green);text-align:center">No fraud flags</td></tr>'; return; }
+    if (!flags.length) { t.innerHTML += '<tr><td colspan="6" style="color:var(--green);text-align:center;padding:24px">No fraud flags \u2014 All clear</td></tr>'; return; }
     flags.forEach(f => {
       t.innerHTML += `<tr>
-        <td>#${f.id}</td><td>User ${f.user_id}</td>
-        <td style="font-family:monospace;font-size:11px">${(f.tx_id||'').substring(0,8)||'—'}</td>
+        <td style="font-weight:600">#${f.id}</td>
+        <td>User ${f.user_id}</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${(f.tx_id||'').substring(0,8)||'\u2014'}</td>
         <td class="${riskClass(f.risk_score)}">${f.risk_score}</td>
         <td>${f.flag_type}</td>
-        <td style="font-size:11px">${f.created_at ? new Date(f.created_at).toLocaleString() : ''}</td>
+        <td style="font-size:11px;color:var(--muted)">${f.created_at ? new Date(f.created_at).toLocaleString() : ''}</td>
       </tr>`;
     });
   } catch(e) {}
@@ -204,13 +211,15 @@ async function loadKYC() {
     const records = await capi('/compliance/kyc_records');
     const t = document.getElementById('kycTable');
     t.innerHTML = '<tr><th>ID</th><th>User</th><th>Type</th><th>Number</th><th>Status</th><th>Actions</th></tr>';
-    if (!records.length) { t.innerHTML += '<tr><td colspan="6" style="color:var(--muted);text-align:center">No KYC records</td></tr>'; return; }
+    if (!records.length) { t.innerHTML += '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px">No KYC records</td></tr>'; return; }
     records.forEach(r => {
+      const statusClass = r.verification_status === 'verified' ? 'sattva' : r.verification_status === 'rejected' ? 'tamas' : 'rajas';
       t.innerHTML += `<tr>
-        <td>#${r.id}</td><td>User ${r.user_id}</td>
+        <td style="font-weight:600">#${r.id}</td>
+        <td>User ${r.user_id}</td>
         <td>${r.document_type}</td>
-        <td style="font-family:monospace">${r.document_number}</td>
-        <td style="color:${r.verification_status === 'verified' ? 'var(--green)' : r.verification_status === 'rejected' ? 'var(--red)' : 'var(--gold)'}">${r.verification_status}</td>
+        <td style="font-family:'JetBrains Mono',monospace">${r.document_number}</td>
+        <td><span class="state-badge ${statusClass}">${r.verification_status}</span></td>
         <td>${r.verification_status === 'pending' ? `<button class="action-btn approve" onclick="kycAction(${r.id},true)">Approve</button><button class="action-btn reject" onclick="kycAction(${r.id},false)">Reject</button>` : ''}</td>
       </tr>`;
     });
@@ -228,7 +237,7 @@ async function loadReport() {
       <div class="report-card">
         <h3>RBI Sandbox Compliance Report</h3>
         <div class="report-row"><span class="report-label">Generated</span><span class="report-value">${new Date(r.generated_at).toLocaleString()}</span></div>
-        <div class="report-row"><span class="report-label">Compliance Status</span><span class="report-value" style="color:${r.compliance_status === 'COMPLIANT' ? 'var(--green)' : 'var(--gold)'}">${r.compliance_status}</span></div>
+        <div class="report-row"><span class="report-label">Compliance Status</span><span class="report-value"><span class="state-badge ${r.compliance_status === 'COMPLIANT' ? 'sattva' : 'rajas'}">${r.compliance_status}</span></span></div>
         <div class="report-row"><span class="report-label">Total Transactions</span><span class="report-value">${r.metrics.total_transactions}</span></div>
         <div class="report-row"><span class="report-label">Success Rate</span><span class="report-value">${r.metrics.success_rate}%</span></div>
         <div class="report-row"><span class="report-label">Avg Latency</span><span class="report-value">${r.metrics.avg_latency_ms}ms</span></div>

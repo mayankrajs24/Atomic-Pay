@@ -140,18 +140,34 @@ def _make_handler(accounts, lock, log_list, name):
 
 
 def start_bank_simulators():
+    import socket
     handler_a = _make_handler(bank_a_accounts, bank_a_lock, bank_a_log, "Bharatiya Gramin Bank")
     handler_b = _make_handler(bank_b_accounts, bank_b_lock, bank_b_log, "Rashtriya Vyapar Bank")
 
-    server_a = HTTPServer(("0.0.0.0", 6001), handler_a)
-    server_b = HTTPServer(("0.0.0.0", 6002), handler_b)
+    for port in [6001, 6002]:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.bind(("0.0.0.0", port))
+        except OSError:
+            sock.close()
+            continue
+        sock.close()
 
-    t_a = threading.Thread(target=server_a.serve_forever, daemon=True)
-    t_b = threading.Thread(target=server_b.serve_forever, daemon=True)
-    t_a.start()
-    t_b.start()
-    print("[AtomicPay] Bank A simulator running on port 6001")
-    print("[AtomicPay] Bank B simulator running on port 6002")
+    try:
+        server_a = HTTPServer(("0.0.0.0", 6001), handler_a)
+        t_a = threading.Thread(target=server_a.serve_forever, daemon=True)
+        t_a.start()
+        print("[AtomicPay] Bank A simulator running on port 6001")
+    except OSError:
+        print("[AtomicPay] Bank A simulator port 6001 already in use, reusing existing")
+
+    try:
+        server_b = HTTPServer(("0.0.0.0", 6002), handler_b)
+        t_b = threading.Thread(target=server_b.serve_forever, daemon=True)
+        t_b.start()
+        print("[AtomicPay] Bank B simulator running on port 6002")
+    except OSError:
+        print("[AtomicPay] Bank B simulator port 6002 already in use, reusing existing")
 
 
 async def call_bank(url: str, payload: dict) -> dict:

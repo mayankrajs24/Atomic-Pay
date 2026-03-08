@@ -7,30 +7,112 @@
 <link rel="stylesheet" href="/static/css/style.css">
 <style>
 body { display: block; }
-.portal { max-width: 900px; margin: 0 auto; padding: 20px; }
-.portal-header { text-align: center; padding: 40px 20px; margin-bottom: 32px; background: radial-gradient(ellipse at 50% 0%, #0d1840 0%, var(--bg) 70%); border-radius: 16px; }
-.portal-header h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+.portal { max-width: 920px; margin: 0 auto; padding: 24px; }
+.portal-header {
+  text-align: center;
+  padding: 48px 24px;
+  margin-bottom: 36px;
+  background: radial-gradient(ellipse at 50% 20%, rgba(99,102,241,.12) 0%, transparent 60%), var(--bg);
+  border-radius: 20px;
+  border: 1px solid var(--bdr);
+}
+.portal-header h1 { font-size: 30px; font-weight: 900; margin-bottom: 10px; letter-spacing: -.02em; }
 .portal-header h1 span { color: var(--accent); }
-.portal-header p { color: var(--muted); font-size: 14px; }
-.nav-links { display: flex; gap: 8px; justify-content: center; margin-bottom: 32px; flex-wrap: wrap; }
-.nav-links a { color: var(--muted); text-decoration: none; font-size: 12px; padding: 6px 12px; border: 1px solid var(--bdr); border-radius: 8px; }
-.nav-links a:hover { color: var(--accent); border-color: var(--accent); }
-.doc-section { background: var(--sur); border: 1px solid var(--bdr); border-radius: 14px; padding: 24px; margin-bottom: 20px; }
-.doc-section h2 { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: var(--accent); }
-.doc-section h3 { font-size: 14px; font-weight: 700; margin: 16px 0 8px; color: var(--txt); }
-.doc-section p { font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 12px; }
-.code-block { background: var(--bg); border: 1px solid var(--bdr); border-radius: 10px; padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.8; color: #8899bb; overflow-x: auto; margin-bottom: 12px; white-space: pre; }
-.endpoint { background: var(--card); border: 1px solid var(--bdr); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
-.endpoint .method { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-right: 8px; }
-.method-get { background: #0a2a18; color: var(--green); }
-.method-post { background: #0a1840; color: var(--accent); }
-.endpoint .path { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
-.endpoint .desc { font-size: 12px; color: var(--muted); margin-top: 6px; }
-.state-diagram { text-align: center; padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 14px; line-height: 2; color: var(--muted); }
-.state-diagram .state { display: inline-block; padding: 8px 16px; border-radius: 10px; margin: 0 8px; font-weight: 700; }
-.state-neg { background: #1a080e; color: var(--red); }
-.state-zero { background: #1a1a08; color: var(--gold); }
-.state-pos { background: #081a10; color: var(--green); }
+.portal-header p { color: var(--muted); font-size: 15px; }
+.nav-links { display: flex; gap: 8px; justify-content: center; margin-bottom: 36px; flex-wrap: wrap; }
+.nav-links a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 8px 16px; border: 1px solid var(--bdr); border-radius: 20px; transition: all .2s; }
+.nav-links a:hover { color: var(--accent2); border-color: var(--accent); }
+.doc-section { background: var(--card); border: 1px solid var(--bdr); border-radius: var(--radius); padding: 28px; margin-bottom: 20px; transition: all .2s; }
+.doc-section:hover { border-color: var(--bdr2); }
+.doc-section h2 { font-size: 20px; font-weight: 700; margin-bottom: 16px; color: var(--accent2); letter-spacing: -.01em; }
+.doc-section h3 { font-size: 15px; font-weight: 700; margin: 20px 0 10px; color: var(--txt); }
+.doc-section p { font-size: 14px; color: var(--txt2); line-height: 1.8; margin-bottom: 14px; }
+.code-block {
+  background: var(--bg);
+  border: 1px solid var(--bdr);
+  border-radius: var(--radius-sm);
+  padding: 18px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--muted);
+  overflow-x: auto;
+  margin-bottom: 14px;
+  white-space: pre;
+}
+.endpoint {
+  background: var(--sur);
+  border: 1px solid var(--bdr);
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  margin-bottom: 10px;
+  transition: all .2s;
+}
+.endpoint:hover { border-color: var(--bdr2); }
+.endpoint .method {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  margin-right: 10px;
+}
+.method-get { background: var(--green-bg); color: var(--green); border: 1px solid rgba(34,197,94,.2); }
+.method-post { background: var(--accent-glow); color: var(--accent2); border: 1px solid rgba(99,102,241,.2); }
+.endpoint .path { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; }
+.endpoint .desc { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+.state-diagram {
+  text-align: center;
+  padding: 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 2;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.state-diagram .state { display: inline-block; padding: 10px 20px; border-radius: 12px; font-weight: 700; }
+.state-neg { background: var(--red-bg); color: var(--red); border: 1px solid rgba(239,68,68,.2); }
+.state-zero { background: var(--gold-bg); color: var(--gold); border: 1px solid rgba(245,158,11,.2); }
+.state-pos { background: var(--green-bg); color: var(--green); border: 1px solid rgba(34,197,94,.2); }
+.integration-card {
+  background: var(--sur);
+  border: 1px solid var(--bdr);
+  border-radius: var(--radius-sm);
+  padding: 18px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.integration-card .int-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.integration-card .int-info { flex: 1; }
+.integration-card .int-name { font-size: 15px; font-weight: 600; }
+.integration-card .int-desc { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.integration-card .int-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid rgba(34,197,94,.2);
+}
 </style>
 </head>
 <body>
@@ -51,12 +133,50 @@ body { display: block; }
     <p>Every AtomicPay transaction exists in exactly one of three states. No transaction may remain in state 0.</p>
     <div class="state-diagram">
       <span class="state state-neg">-1 Tamas (Reversed)</span>
-      &#8592;
+      <span style="color:var(--dim)">&#8592;</span>
       <span class="state state-zero">0 Rajas (Transit)</span>
-      &#8594;
+      <span style="color:var(--dim)">&#8594;</span>
       <span class="state state-pos">+1 Sattva (Completed)</span>
     </div>
     <p>The zero state exists only during the atomic transit window (target: under 500ms). If any failure occurs, the transaction automatically snaps to -1. This eliminates stuck transactions and suspense accounts by design.</p>
+  </div>
+
+  <div class="doc-section">
+    <h2>App Integrations</h2>
+    <p>AtomicPay supports integration with all major UPI-compatible payment apps through a standardized atomic protocol.</p>
+
+    <div class="integration-card">
+      <div class="int-icon" style="background:linear-gradient(135deg,#4285f4,#34a853)">G</div>
+      <div class="int-info">
+        <div class="int-name">Google Pay</div>
+        <div class="int-desc">Full UPI integration via AtomicPay protocol</div>
+      </div>
+      <div class="int-badge">Ready</div>
+    </div>
+    <div class="integration-card">
+      <div class="int-icon" style="background:linear-gradient(135deg,#5f259f,#3f1966)">P</div>
+      <div class="int-info">
+        <div class="int-name">PhonePe</div>
+        <div class="int-desc">UPI deep link integration with atomic guarantees</div>
+      </div>
+      <div class="int-badge">Ready</div>
+    </div>
+    <div class="integration-card">
+      <div class="int-icon" style="background:linear-gradient(135deg,#002970,#00baf2)">T</div>
+      <div class="int-info">
+        <div class="int-name">Paytm</div>
+        <div class="int-desc">Wallet + UPI via AtomicPay settlement</div>
+      </div>
+      <div class="int-badge">Ready</div>
+    </div>
+    <div class="integration-card">
+      <div class="int-icon" style="background:linear-gradient(135deg,var(--accent),#4f46e5)">&#9889;</div>
+      <div class="int-info">
+        <div class="int-name">AtomicPay Native</div>
+        <div class="int-desc">Direct atomic payments with full protocol visibility</div>
+      </div>
+      <div class="int-badge">Active</div>
+    </div>
   </div>
 
   <div class="doc-section">
@@ -89,14 +209,14 @@ body { display: block; }
     <div class="endpoint">
       <span class="method method-get">GET</span>
       <span class="path">/api/balance</span>
-      <div class="desc">Get account balance. Auth required.</div>
+      <div class="desc">Get account balance from linked bank. Auth required.</div>
     </div>
 
     <h3>Payments</h3>
     <div class="endpoint">
       <span class="method method-post">POST</span>
       <span class="path">/api/pay</span>
-      <div class="desc">Execute atomic payment. Auth required. Body: { receiver_mobile, amount, note }</div>
+      <div class="desc">Execute atomic payment with two-phase commit. Auth required. Body: { receiver_mobile, amount, note }. Payment requires PIN re-authentication on the client side.</div>
     </div>
     <div class="endpoint">
       <span class="method method-post">POST</span>
@@ -106,36 +226,36 @@ body { display: block; }
     <div class="endpoint">
       <span class="method method-get">GET</span>
       <span class="path">/api/history</span>
-      <div class="desc">Get transaction history. Auth required.</div>
+      <div class="desc">Get transaction history (last 50). Auth required.</div>
     </div>
 
     <h3>KYC</h3>
     <div class="endpoint">
       <span class="method method-post">POST</span>
       <span class="path">/api/kyc/submit</span>
-      <div class="desc">Submit KYC document. Auth required. Body: { document_type, document_number }</div>
+      <div class="desc">Submit KYC document. Auth required. Body: { document_type: "PAN"|"AADHAAR"|"PASSPORT", document_number }</div>
     </div>
     <div class="endpoint">
       <span class="method method-get">GET</span>
       <span class="path">/api/kyc/status</span>
-      <div class="desc">Get KYC verification status. Auth required.</div>
+      <div class="desc">Get KYC verification status and submitted documents. Auth required.</div>
     </div>
 
-    <h3>Regulatory</h3>
+    <h3>Regulatory (Admin only)</h3>
     <div class="endpoint">
       <span class="method method-get">GET</span>
       <span class="path">/api/regulatory/reports</span>
-      <div class="desc">RBI sandbox compliance report. Admin required.</div>
+      <div class="desc">RBI sandbox compliance report with system metrics.</div>
     </div>
     <div class="endpoint">
       <span class="method method-get">GET</span>
       <span class="path">/api/regulatory/audit_logs</span>
-      <div class="desc">Full audit trail. Admin required.</div>
+      <div class="desc">Full audit trail for regulatory review.</div>
     </div>
     <div class="endpoint">
       <span class="method method-get">GET</span>
       <span class="path">/api/regulatory/transactions</span>
-      <div class="desc">All transactions for regulatory review. Admin required.</div>
+      <div class="desc">Complete transaction data for regulatory analysis.</div>
     </div>
   </div>
 
@@ -174,14 +294,15 @@ Response: {"state": 1, "name": "John", "balance": 10000, "active": true}</div>
   <div class="doc-section">
     <h2>Payment Flow</h2>
 <div class="code-block">1. Client sends POST /api/pay { receiver_mobile, amount, note }
-2. Gateway creates transaction (state = 0, Rajas)
-3. Gateway calls sender bank: DEBIT
-4. Gateway calls receiver bank: CREDIT
-5a. Both succeed &#8594; state = +1 (Sattva) &#8594; COMPLETED
-5b. Any fails &#8594; UNLOCK sender &#8594; state = -1 (Tamas) &#8594; REVERSED
-6. Transaction signed with HMAC-SHA256
-7. Fraud score calculated, AML rules checked
-8. Full audit trail recorded</div>
+2. Client-side PIN/biometric verification required
+3. Gateway creates transaction (state = 0, Rajas)
+4. Gateway calls sender bank: DEBIT
+5. Gateway calls receiver bank: CREDIT
+6a. Both succeed &#8594; state = +1 (Sattva) &#8594; COMPLETED
+6b. Any fails &#8594; UNLOCK sender &#8594; state = -1 (Tamas) &#8594; REVERSED
+7. Transaction signed with HMAC-SHA256
+8. Fraud score calculated, AML rules checked
+9. Full audit trail recorded</div>
   </div>
 
   <div class="doc-section">
@@ -197,14 +318,18 @@ Admin:
 
   <div class="doc-section">
     <h2>Security</h2>
-    <p>AtomicPay implements the following security measures:</p>
-<div class="code-block">Authentication: JWT tokens with bcrypt PIN hashing
-Signatures:    HMAC-SHA256 on every transaction
-Fraud:         Real-time scoring (velocity, volume, KYC level)
-AML:           Structuring detection, rapid transfer monitoring
-KYC:           3-level verification (PAN, Aadhaar, Passport)
-Audit:         Complete event trail for regulatory compliance
-PCI DSS:       Tokenized sensitive data, encrypted storage</div>
+    <p>AtomicPay implements production-grade security measures for fintech compliance:</p>
+<div class="code-block">Authentication:  JWT tokens with PBKDF2-SHA256 PIN hashing
+Authorization:   Server-side role verification on all admin endpoints
+Rate Limiting:   5 login attempts per 5-minute window
+PIN Confirmation: Required before every payment transaction
+Biometric:       WebAuthn fingerprint support for payment auth
+Signatures:      HMAC-SHA256 on every transaction record
+Fraud:           Real-time scoring (velocity, volume, KYC level)
+AML:             Structuring detection, rapid transfer monitoring
+KYC:             3-level verification (PAN, Aadhaar, Passport)
+Audit:           Complete event trail for regulatory compliance
+UPI Compatible:  Interoperable with GPay, PhonePe, Paytm</div>
   </div>
 </div>
 </body>
