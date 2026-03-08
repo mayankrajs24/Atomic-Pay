@@ -1,15 +1,23 @@
+import logging
+import sys
+import os
+import time
+import traceback
+from collections import defaultdict
+from datetime import datetime
+
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
-from collections import defaultdict
-import os
-import time
 
+from backend.config import IS_PRODUCTION
 from backend.database import get_db, init_db
 from backend.models import User, Transaction, Bank, KYCRecord, AMLAlert, FraudFlag, AuditLog
 from backend.auth import hash_pin, verify_pin, create_token, get_current_user, get_optional_user
@@ -21,12 +29,39 @@ from backend.payments import execute_payment
 from backend.kyc import submit_kyc_document, verify_kyc_document
 from backend.monitoring import get_system_metrics
 from backend.compliance import log_audit
+from backend.middleware import RequestIdMiddleware, SecurityHeadersMiddleware, RateLimitMiddleware
 
-app = FastAPI(title="AtomicPay", version="1.0.0", description="The World's First -1/0/+1 Atomic Payment System")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    stream=sys.stdout,
+)
+logger = logging.getLogger("atomicpay")
+
+app = FastAPI(
+    title="AtomicPay",
+    version="2.0.0",
+    description="The World's First -1/0/+1 Atomic Payment System",
+    docs_url="/api/docs" if not IS_PRODUCTION else None,
+    redoc_url="/api/redoc" if not IS_PRODUCTION else None,
+)
+
+app.add_middleware(GZipMiddleware, minimum_size=500)
+app.add_middleware(RequestIdMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 LOGIN_ATTEMPTS = defaultdict(list)
 MAX_LOGIN_ATTEMPTS = 5
 LOGIN_WINDOW_SECONDS = 300
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 def check_rate_limit(mobile: str):
@@ -46,44 +81,81 @@ def require_admin(user_data: dict, db: Session):
         raise HTTPException(403, "Admin access required")
     return user
 
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    request_id = getattr(request.state, "request_id", "unknown")
+    logger.error(f"[{request_id}] Unhandled error: {exc}\n{traceback.format_exc()}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "request_id": request_id},
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    request_id = getattr(request.state, "request_id", "unknown")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "request_id": request_id},
+    )
+
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 
 class RegisterRequest(BaseModel):
-    name: str
-    mobile: str
-    pin: str
+    name: str = Field(..., min_length=1, max_length=100)
+    mobile: str = Field(..., min_length=10, max_length=15, pattern=r"^\d{10,15}$")
+    pin: str = Field(..., min_length=4, max_length=20)
     email: Optional[str] = None
 
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, v):
+        v = v.strip()
+        if not v:
+            raise ValueError("Name cannot be empty")
+        return v
+
+
 class LoginRequest(BaseModel):
-    mobile: str
-    pin: str
+    mobile: str = Field(..., min_length=10, max_length=15)
+    pin: str = Field(..., min_length=4, max_length=20)
+
 
 class LinkBankRequest(BaseModel):
-    bank_id: str
-    account_id: str
+    bank_id: str = Field(..., min_length=1, max_length=50)
+    account_id: str = Field(..., min_length=1, max_length=100)
+
 
 class PayRequest(BaseModel):
-    receiver_mobile: str
-    amount: float
-    note: Optional[str] = ""
+    receiver_mobile: str = Field(..., min_length=10, max_length=15)
+    amount: float = Field(..., gt=0)
+    note: Optional[str] = Field("", max_length=500)
+    idempotency_key: Optional[str] = Field(None, max_length=64)
+
 
 class FindUserRequest(BaseModel):
-    mobile: str
+    mobile: str = Field(..., min_length=10, max_length=15)
+
 
 class KYCSubmitRequest(BaseModel):
-    document_type: str
-    document_number: str
+    document_type: str = Field(..., min_length=1, max_length=20)
+    document_number: str = Field(..., min_length=1, max_length=50)
+
 
 class KYCVerifyRequest(BaseModel):
     record_id: int
     approve: bool
 
+
 class AMLActionRequest(BaseModel):
     alert_id: int
-    action: str
+    action: str = Field(..., pattern=r"^(resolved|dismissed)$")
+
 
 class BankRegisterRequest(BaseModel):
     name: str
@@ -97,8 +169,8 @@ class BankRegisterRequest(BaseModel):
 async def startup():
     init_db()
     start_bank_simulators()
-    print("[AtomicPay] Database initialized")
-    print("[AtomicPay] Gateway ready on port 5000")
+    logger.info("Database initialized")
+    logger.info(f"Gateway ready on port 5000 (production={IS_PRODUCTION})")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -121,9 +193,26 @@ async def developer_page(request: Request):
     return templates.TemplateResponse("developer.html", {"request": request})
 
 
+@app.get("/api/health")
+async def health_check(db: Session = Depends(get_db)):
+    try:
+        db.execute(__import__("sqlalchemy").text("SELECT 1"))
+        db_status = "healthy"
+    except Exception:
+        db_status = "unhealthy"
+
+    return {
+        "status": "healthy" if db_status == "healthy" else "degraded",
+        "service": "AtomicPay Gateway",
+        "version": "2.0.0",
+        "database": db_status,
+        "uptime": round(time.time() - __import__("backend.monitoring", fromlist=["_start_time"])._start_time),
+    }
+
+
 @app.get("/api/ping")
 async def ping():
-    return {"state": 1, "service": "AtomicPay Gateway", "version": "1.0.0"}
+    return {"state": 1, "service": "AtomicPay Gateway", "version": "2.0.0"}
 
 
 @app.get("/api/banks")
@@ -140,14 +229,7 @@ async def list_banks():
 
 
 @app.post("/api/register")
-async def register(req: RegisterRequest, db: Session = Depends(get_db)):
-    if not req.name.strip() or not req.mobile.strip() or not req.pin.strip():
-        raise HTTPException(400, "Missing fields")
-    if len(req.mobile) < 10:
-        raise HTTPException(400, "Invalid mobile number")
-    if len(req.pin) < 4:
-        raise HTTPException(400, "PIN must be at least 4 digits")
-
+async def register(req: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.mobile == req.mobile).first()
     if existing:
         raise HTTPException(409, "Mobile number already registered")
@@ -165,7 +247,10 @@ async def register(req: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    log_audit(db, "USER_REGISTERED", req.mobile, f"name={req.name}")
+
+    ip = _client_ip(request)
+    log_audit(db, "USER_REGISTERED", req.mobile, f"name={req.name}", ip_address=ip)
+    logger.info(f"User registered: {req.mobile} ({req.name})")
 
     token = create_token({"sub": user.mobile, "name": user.name, "role": user.role, "user_id": user.id})
     return {
@@ -175,7 +260,7 @@ async def register(req: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @app.post("/api/login")
-async def login(req: LoginRequest, db: Session = Depends(get_db)):
+async def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     mobile = req.mobile.strip()
     check_rate_limit(mobile)
 
@@ -183,13 +268,27 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
     if not user:
         record_login_attempt(mobile)
         raise HTTPException(404, "User not found")
+
+    if not user.is_active:
+        raise HTTPException(403, "Account is suspended")
+
     if not verify_pin(req.pin, user.pin_hash):
         record_login_attempt(mobile)
+        user.failed_login_count = (user.failed_login_count or 0) + 1
+        user.last_failed_login = datetime.utcnow()
+        db.commit()
+        logger.warning(f"Failed login attempt for {mobile}")
         raise HTTPException(401, "Wrong PIN")
+
+    if user.failed_login_count and user.failed_login_count > 0:
+        user.failed_login_count = 0
+        db.commit()
 
     bank = AVAILABLE_BANKS.get(user.bank_id or "", {})
     token = create_token({"sub": user.mobile, "name": user.name, "role": user.role, "user_id": user.id})
-    log_audit(db, "USER_LOGIN", req.mobile, "Login successful")
+
+    ip = _client_ip(request)
+    log_audit(db, "USER_LOGIN", req.mobile, "Login successful", ip_address=ip)
 
     return {
         "state": 1, "name": user.name, "mobile": user.mobile,
@@ -205,7 +304,8 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
 
 
 @app.post("/api/link_bank")
-async def link_bank(req: LinkBankRequest, user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+async def link_bank(req: LinkBankRequest, request: Request,
+                    user_data=Depends(get_current_user), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.mobile == user_data["sub"]).first()
     if not user:
         raise HTTPException(404, "User not found")
@@ -222,7 +322,8 @@ async def link_bank(req: LinkBankRequest, user_data=Depends(get_current_user), d
     db.commit()
 
     bank = AVAILABLE_BANKS[req.bank_id]
-    log_audit(db, "BANK_LINKED", user.mobile, f"bank={req.bank_id} acc={user.account_id}")
+    ip = _client_ip(request)
+    log_audit(db, "BANK_LINKED", user.mobile, f"bank={req.bank_id} acc={user.account_id}", ip_address=ip)
     return {
         "state": 1, "account_id": user.account_id,
         "bank_name": bank["name"], "bank_label": bank["label"],
@@ -247,10 +348,12 @@ async def balance(user_data=Depends(get_current_user), db: Session = Depends(get
 
 
 @app.post("/api/pay")
-async def pay(req: PayRequest, user_data=Depends(get_current_user), db: Session = Depends(get_db)):
-    if req.amount <= 0:
-        raise HTTPException(400, "Invalid amount")
-    result = await execute_payment(db, user_data["sub"], req.receiver_mobile.strip(), req.amount, req.note or "")
+async def pay(req: PayRequest, request: Request,
+              user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    result = await execute_payment(
+        db, user_data["sub"], req.receiver_mobile.strip(),
+        req.amount, req.note or "", req.idempotency_key
+    )
     return result
 
 
@@ -368,14 +471,16 @@ async def aml_alerts(user_data=Depends(get_current_user), db: Session = Depends(
 
 
 @app.post("/api/compliance/aml_action")
-async def aml_action(req: AMLActionRequest, user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+async def aml_action(req: AMLActionRequest, request: Request,
+                     user_data=Depends(get_current_user), db: Session = Depends(get_db)):
     require_admin(user_data, db)
     alert = db.query(AMLAlert).filter(AMLAlert.id == req.alert_id).first()
     if not alert:
         raise HTTPException(404, "Alert not found")
     alert.status = req.action
     db.commit()
-    log_audit(db, "AML_ACTION", user_data["sub"], f"alert={req.alert_id} action={req.action}")
+    ip = _client_ip(request)
+    log_audit(db, "AML_ACTION", user_data["sub"], f"alert={req.alert_id} action={req.action}", ip_address=ip)
     return {"success": True, "status": alert.status}
 
 
@@ -432,7 +537,7 @@ async def regulatory_reports(user_data=Depends(get_current_user), db: Session = 
     kyc_pending = db.query(KYCRecord).filter(KYCRecord.verification_status == "pending").count()
     return {
         "report_type": "RBI_SANDBOX_COMPLIANCE",
-        "generated_at": __import__("datetime").datetime.utcnow().isoformat(),
+        "generated_at": datetime.utcnow().isoformat(),
         "metrics": metrics,
         "aml_summary": {"open_alerts": open_aml, "total_alerts": total_aml},
         "kyc_summary": {"pending_verifications": kyc_pending},
@@ -484,4 +589,5 @@ async def seed_demo(db: Session = Depends(get_db)):
     db.add_all([ram, sita, arjun])
     db.commit()
     log_audit(db, "DEMO_SEEDED", "system", "Demo users and admin created")
-    return {"message": "Demo data seeded successfully", "admin_mobile": "0000000000", "admin_pin": "admin123"}
+    logger.info("Demo data seeded successfully")
+    return {"message": "Demo data seeded successfully"}

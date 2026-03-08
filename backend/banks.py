@@ -2,8 +2,11 @@ import httpx
 import threading
 import json
 import time
+import logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from backend.config import BANK_A_URL, BANK_B_URL, GATEWAY_TIMEOUT
+
+logger = logging.getLogger("atomicpay.banks")
 
 AVAILABLE_BANKS = {
     "bank_a": {
@@ -13,7 +16,7 @@ AVAILABLE_BANKS = {
         "label": "Bank A",
         "url": BANK_A_URL,
         "color": "#3b7fff",
-        "icon": "🏦",
+        "icon": "\U0001f3e6",
     },
     "bank_b": {
         "id": "bank_b",
@@ -22,7 +25,7 @@ AVAILABLE_BANKS = {
         "label": "Bank B",
         "url": BANK_B_URL,
         "color": "#f472b6",
-        "icon": "🏛️",
+        "icon": "\U0001f3db\ufe0f",
     },
 }
 
@@ -46,7 +49,7 @@ bank_b_log = []
 def _bank_log(log_list, msg):
     line = f"[{time.strftime('%H:%M:%S')}] {msg}"
     log_list.append(line)
-    if len(log_list) > 100:
+    if len(log_list) > 200:
         log_list.pop(0)
 
 
@@ -62,10 +65,10 @@ def _process_bank_action(accounts, lock, log_list, action, body):
                 _bank_log(log_list, f"  DEBIT FAIL  [{tx_id}]  Account '{acc_id}' not found")
                 return {"state": -1, "reason": "ACCOUNT_NOT_FOUND"}
             if not acc["active"]:
-                _bank_log(log_list, f"  DEBIT FAIL  [{tx_id}]  {acc['name']} — frozen")
+                _bank_log(log_list, f"  DEBIT FAIL  [{tx_id}]  {acc['name']} \u2014 frozen")
                 return {"state": -1, "reason": "ACCOUNT_FROZEN"}
             if acc["balance"] < amount:
-                _bank_log(log_list, f"  DEBIT FAIL  [{tx_id}]  {acc['name']} — insufficient")
+                _bank_log(log_list, f"  DEBIT FAIL  [{tx_id}]  {acc['name']} \u2014 insufficient")
                 return {"state": -1, "reason": "INSUFFICIENT_FUNDS",
                         "available": acc["balance"], "required": amount}
             acc["balance"] -= amount
@@ -115,10 +118,13 @@ class BankHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps({"state": 1, "service": self.bank_name}).encode())
 
     def do_POST(self):
-        length = int(self.headers.get("Content-Length", 0))
-        body = json.loads(self.rfile.read(length))
-        action = body.get("action", "")
-        resp = _process_bank_action(self.bank_accounts, self.bank_lock, self.bank_log, action, body)
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length))
+            action = body.get("action", "")
+            resp = _process_bank_action(self.bank_accounts, self.bank_lock, self.bank_log, action, body)
+        except Exception as e:
+            resp = {"state": -1, "reason": f"INTERNAL_ERROR: {str(e)}"}
         raw = json.dumps(resp).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -157,31 +163,42 @@ def start_bank_simulators():
         server_a = HTTPServer(("0.0.0.0", 6001), handler_a)
         t_a = threading.Thread(target=server_a.serve_forever, daemon=True)
         t_a.start()
-        print("[AtomicPay] Bank A simulator running on port 6001")
+        logger.info("Bank A simulator running on port 6001")
     except OSError:
-        print("[AtomicPay] Bank A simulator port 6001 already in use, reusing existing")
+        logger.info("Bank A simulator port 6001 already in use, reusing existing")
 
     try:
         server_b = HTTPServer(("0.0.0.0", 6002), handler_b)
         t_b = threading.Thread(target=server_b.serve_forever, daemon=True)
         t_b.start()
-        print("[AtomicPay] Bank B simulator running on port 6002")
+        logger.info("Bank B simulator running on port 6002")
     except OSError:
-        print("[AtomicPay] Bank B simulator port 6002 already in use, reusing existing")
+        logger.info("Bank B simulator port 6002 already in use, reusing existing")
 
 
-async def call_bank(url: str, payload: dict) -> dict:
-    try:
-        async with httpx.AsyncClient(timeout=GATEWAY_TIMEOUT) as client:
-            r = await client.post(url, json=payload)
-            return r.json()
-    except Exception:
-        return {"state": -1, "reason": "BANK_UNREACHABLE"}
+async def call_bank(url: str, payload: dict, retries: int = 2) -> dict:
+    last_error = None
+    for attempt in range(retries + 1):
+        try:
+            async with httpx.AsyncClient(timeout=GATEWAY_TIMEOUT) as client:
+                r = await client.post(url, json=payload)
+                return r.json()
+        except httpx.TimeoutException:
+            last_error = "BANK_TIMEOUT"
+            logger.warning(f"Bank call timeout (attempt {attempt + 1}/{retries + 1}): {url}")
+        except httpx.ConnectError:
+            last_error = "BANK_UNREACHABLE"
+            logger.warning(f"Bank connection failed (attempt {attempt + 1}/{retries + 1}): {url}")
+        except Exception as e:
+            last_error = f"BANK_ERROR: {str(e)}"
+            logger.error(f"Bank call error: {e}")
+            break
+    return {"state": -1, "reason": last_error or "BANK_UNREACHABLE"}
 
 
 async def ping_bank(url: str) -> bool:
     try:
-        async with httpx.AsyncClient(timeout=1.0) as client:
+        async with httpx.AsyncClient(timeout=2.0) as client:
             r = await client.get(url)
             return r.status_code == 200
     except Exception:

@@ -2,17 +2,46 @@ import uuid
 import time
 import hashlib
 import hmac
+import logging
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from backend.banks import AVAILABLE_BANKS, call_bank
 from backend.models import Transaction, User
 from backend.fraud_detection import calculate_fraud_score
 from backend.aml import check_aml_rules
 from backend.compliance import log_audit
+from backend.config import SESSION_SECRET, MAX_PAYMENT_AMOUNT, MIN_PAYMENT_AMOUNT, DAILY_LIMIT_DEFAULT, DAILY_LIMIT_KYC2
+from datetime import datetime, timedelta
+
+logger = logging.getLogger("atomicpay.payments")
 
 
-async def execute_payment(db: Session, sender_mobile: str, receiver_mobile: str, amount: float, note: str = ""):
-    sender = db.query(User).filter(User.mobile == sender_mobile).first()
-    receiver = db.query(User).filter(User.mobile == receiver_mobile).first()
+async def execute_payment(db: Session, sender_mobile: str, receiver_mobile: str,
+                          amount: float, note: str = "", idempotency_key: str = None):
+    if amount < MIN_PAYMENT_AMOUNT:
+        return _fail(f"Minimum payment is Rs.{MIN_PAYMENT_AMOUNT:.0f}")
+    if amount > MAX_PAYMENT_AMOUNT:
+        return _fail(f"Maximum payment is Rs.{MAX_PAYMENT_AMOUNT:,.0f}")
+
+    amount = round(amount, 2)
+
+    if idempotency_key:
+        existing = db.query(Transaction).filter(
+            Transaction.idempotency_key == idempotency_key,
+            Transaction.sender_mobile == sender_mobile
+        ).first()
+        if existing:
+            logger.info(f"Idempotent replay: {idempotency_key} for {sender_mobile}")
+            return _tx_to_result(existing)
+
+    sender = db.query(User).filter(
+        User.mobile == sender_mobile,
+        User.is_active == True
+    ).first()
+    receiver = db.query(User).filter(
+        User.mobile == receiver_mobile,
+        User.is_active == True
+    ).first()
 
     if not sender:
         return _fail("SENDER_NOT_FOUND")
@@ -24,10 +53,20 @@ async def execute_payment(db: Session, sender_mobile: str, receiver_mobile: str,
         return _fail("RECEIVER_BANK_NOT_LINKED")
     if sender.mobile == receiver.mobile:
         return _fail("CANNOT_PAY_SELF")
-    if amount <= 0:
-        return _fail("INVALID_AMOUNT")
+
+    daily_limit = DAILY_LIMIT_KYC2 if sender.kyc_level >= 2 else DAILY_LIMIT_DEFAULT
     if amount > 100000 and sender.kyc_level < 2:
         return _fail("KYC_LEVEL_REQUIRED")
+
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    from sqlalchemy import func
+    daily_total = db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+        Transaction.sender_mobile == sender.mobile,
+        Transaction.state == 1,
+        Transaction.created_at >= today_start
+    ).scalar()
+    if daily_total + amount > daily_limit:
+        return _fail(f"Daily limit exceeded. Used: Rs.{daily_total:,.0f} / Rs.{daily_limit:,.0f}")
 
     sb = AVAILABLE_BANKS.get(sender.bank_id)
     rb = AVAILABLE_BANKS.get(receiver.bank_id)
@@ -36,10 +75,11 @@ async def execute_payment(db: Session, sender_mobile: str, receiver_mobile: str,
 
     fraud_score = calculate_fraud_score(db, sender, amount)
     if fraud_score > 0.9:
+        logger.warning(f"Payment blocked by fraud: sender={sender.mobile} score={fraud_score}")
         return _fail("TRANSACTION_BLOCKED_FRAUD")
 
     tx_id = str(uuid.uuid4())
-    t0 = time.time()
+    t0 = time.monotonic()
     steps = []
 
     steps.append(f"Tx {tx_id[:8]}  |  State: 0 (Rajas)")
@@ -50,11 +90,13 @@ async def execute_payment(db: Session, sender_mobile: str, receiver_mobile: str,
     steps.append("Phase 1 PREPARE")
     steps.append(f"  Debit {sender.name} @ {sb['name']}...")
 
+    logger.info(f"[{tx_id[:8]}] Payment initiated: {sender.mobile} -> {receiver.mobile} Rs.{amount}")
+
     debit = await call_bank(sb["url"], {
         "action": "DEBIT", "tx_id": tx_id,
         "account_id": sender.account_id, "amount": amount
     })
-    elapsed = (time.time() - t0) * 1000
+    elapsed = (time.monotonic() - t0) * 1000
 
     if debit.get("state") != 1:
         reason = debit.get("reason", "DEBIT_FAILED")
@@ -64,9 +106,10 @@ async def execute_payment(db: Session, sender_mobile: str, receiver_mobile: str,
             steps.append(f"  Has Rs.{avail:.0f}  Needs Rs.{amount:.0f}")
         steps.append("State: -1 (Tamas REVERSED)")
         result = _seal(tx_id, -1, amount, sender, receiver, elapsed, reason, steps, note, fraud_score)
-        _save_tx(db, result, sender, receiver)
+        _save_tx(db, result, sender, receiver, idempotency_key)
         check_aml_rules(db, sender, result)
         log_audit(db, "PAYMENT_FAILED", sender.mobile, f"tx={tx_id[:8]} reason={reason} amt={amount}")
+        logger.info(f"[{tx_id[:8]}] Payment failed: {reason} ({elapsed:.1f}ms)")
         return result
 
     nsb = debit.get("new_balance")
@@ -77,7 +120,7 @@ async def execute_payment(db: Session, sender_mobile: str, receiver_mobile: str,
         "action": "CREDIT", "tx_id": tx_id,
         "account_id": receiver.account_id, "amount": amount
     })
-    elapsed = (time.time() - t0) * 1000
+    elapsed = (time.monotonic() - t0) * 1000
 
     if credit.get("state") != 1:
         reason = credit.get("reason", "CREDIT_FAILED")
@@ -90,23 +133,25 @@ async def execute_payment(db: Session, sender_mobile: str, receiver_mobile: str,
         steps.append("  Rollback complete.")
         steps.append("State: -1 (Tamas REVERSED)")
         result = _seal(tx_id, -1, amount, sender, receiver, elapsed, reason, steps, note, fraud_score)
-        _save_tx(db, result, sender, receiver)
+        _save_tx(db, result, sender, receiver, idempotency_key)
         log_audit(db, "PAYMENT_ROLLBACK", sender.mobile, f"tx={tx_id[:8]} reason={reason}")
+        logger.info(f"[{tx_id[:8]}] Payment rolled back: {reason} ({elapsed:.1f}ms)")
         return result
 
     nrb = credit.get("new_balance")
     steps.append(f"  Confirmed. {receiver.name} balance: Rs.{nrb:,.0f}")
-    elapsed = (time.time() - t0) * 1000
+    elapsed = (time.monotonic() - t0) * 1000
     steps.append("-" * 42)
-    steps.append("Phase 2 COMMIT — Both banks confirmed")
+    steps.append("Phase 2 COMMIT \u2014 Both banks confirmed")
     steps.append(f"Transit (Rajas 0): {elapsed:.1f}ms")
     steps.append("State: +1 (Sattva COMPLETED)")
 
     result = _seal(tx_id, 1, amount, sender, receiver, elapsed, "COMPLETED", steps, note, fraud_score,
                    new_sender_bal=nsb, new_receiver_bal=nrb)
-    _save_tx(db, result, sender, receiver)
+    _save_tx(db, result, sender, receiver, idempotency_key)
     check_aml_rules(db, sender, result)
     log_audit(db, "PAYMENT_COMPLETED", sender.mobile, f"tx={tx_id[:8]} amt={amount} to={receiver.mobile}")
+    logger.info(f"[{tx_id[:8]}] Payment completed: Rs.{amount} ({elapsed:.1f}ms)")
     return result
 
 
@@ -123,9 +168,10 @@ def _fail(reason):
 
 def _seal(tx_id, state, amount, sender, receiver, transit_ms, reason, steps, note, fraud_score,
           new_sender_bal=None, new_receiver_bal=None):
+    sig_data = f"{tx_id}|{state}|{amount}|{sender.mobile}|{receiver.mobile}"
     sig = hmac.new(
-        b"atomicpay-production",
-        f"{tx_id}|{state}|{amount}".encode(),
+        SESSION_SECRET.encode(),
+        sig_data.encode(),
         hashlib.sha256
     ).hexdigest()[:16]
     return {
@@ -149,9 +195,10 @@ def _seal(tx_id, state, amount, sender, receiver, transit_ms, reason, steps, not
     }
 
 
-def _save_tx(db: Session, result: dict, sender, receiver):
+def _save_tx(db: Session, result: dict, sender, receiver, idempotency_key=None):
     tx = Transaction(
         tx_id=result["tx_id"],
+        idempotency_key=idempotency_key,
         sender_id=sender.id,
         receiver_id=receiver.id,
         sender_mobile=result["sender_mobile"],
@@ -168,3 +215,25 @@ def _save_tx(db: Session, result: dict, sender, receiver):
     )
     db.add(tx)
     db.commit()
+
+
+def _tx_to_result(tx: Transaction) -> dict:
+    return {
+        "tx_id": tx.tx_id,
+        "state": tx.state,
+        "amount": tx.amount,
+        "sender_mobile": tx.sender_mobile,
+        "receiver_mobile": tx.receiver_mobile,
+        "sender_name": tx.sender_name,
+        "receiver_name": tx.receiver_name,
+        "new_sender_bal": None,
+        "new_receiver_bal": None,
+        "note": tx.note,
+        "transit_ms": tx.transit_time_ms,
+        "time": tx.created_at.strftime("%H:%M:%S") if tx.created_at else "",
+        "date": tx.created_at.strftime("%d %b %Y") if tx.created_at else "",
+        "reason": tx.reason,
+        "signature": tx.signature,
+        "steps": [],
+        "fraud_score": tx.fraud_score,
+    }
