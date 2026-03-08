@@ -57,6 +57,37 @@ class Bank(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class BankBranch(Base):
+    __tablename__ = "bank_branches"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    bank_id = Column(String(50), ForeignKey("banks.bank_id"), nullable=False, index=True)
+    branch_name = Column(String(255), nullable=False)
+    ifsc_code = Column(String(11), unique=True, nullable=False, index=True)
+    branch_city = Column(String(100), nullable=True)
+    branch_state = Column(String(100), nullable=True)
+    branch_address = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class UserBankAccount(Base):
+    __tablename__ = "user_bank_accounts"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    bank_id = Column(String(50), nullable=False, index=True)
+    branch_ifsc = Column(String(11), nullable=True, index=True)
+    account_id = Column(String(100), nullable=False)
+    account_type = Column(String(30), default="savings")
+    account_label = Column(String(100), nullable=True)
+    is_primary = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
+    linked_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_user_bank_unique", "user_id", "bank_id", "account_id", unique=True),
+    )
+
+
 class Transaction(Base):
     __tablename__ = "transactions"
     id = Column(Integer, primary_key=True, autoincrement=True)

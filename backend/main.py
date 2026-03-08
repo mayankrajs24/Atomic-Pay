@@ -33,7 +33,10 @@ from backend.middleware import RequestIdMiddleware, SecurityHeadersMiddleware, R
 from backend.bank_connector import (
     register_bank, approve_bank, suspend_bank, regenerate_api_key,
     health_check_bank, test_bank_connection, load_active_banks_from_db,
-    get_all_registered_banks
+    get_all_registered_banks, register_branch, register_branches_bulk,
+    get_branches_by_bank, lookup_by_ifsc, add_user_account,
+    get_user_accounts, set_primary_account, remove_user_account,
+    get_primary_account
 )
 
 logging.basicConfig(
@@ -180,6 +183,50 @@ class BankActionRequest(BaseModel):
     reason: Optional[str] = Field(None, max_length=500)
 
 
+class BankSelfRegisterRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=200)
+    bank_id: str = Field(..., min_length=2, max_length=50, pattern=r"^[a-z0-9_]+$")
+    api_url: str = Field(..., min_length=5, max_length=500)
+    ifsc_prefix: Optional[str] = Field(None, min_length=4, max_length=4, pattern=r"^[A-Z]{4}$")
+    short_code: Optional[str] = Field(None, max_length=10)
+    contact_name: str = Field(..., min_length=2, max_length=200)
+    contact_email: str = Field(..., min_length=5, max_length=255)
+    environment: Optional[str] = Field("sandbox", pattern=r"^(sandbox|production)$")
+
+
+class BranchRegisterRequest(BaseModel):
+    branch_name: str = Field(..., min_length=2, max_length=200)
+    ifsc_code: str = Field(..., min_length=11, max_length=11, pattern=r"^[A-Z]{4}0[A-Z0-9]{6}$")
+    branch_city: Optional[str] = Field(None, max_length=100)
+    branch_state: Optional[str] = Field(None, max_length=100)
+    branch_address: Optional[str] = Field(None, max_length=500)
+
+
+class BranchBulkItem(BaseModel):
+    branch_name: str = Field(..., min_length=2, max_length=200)
+    ifsc_code: str = Field(..., min_length=11, max_length=11, pattern=r"^[A-Z]{4}0[A-Z0-9]{6}$")
+    branch_city: Optional[str] = Field(None, max_length=100)
+    branch_state: Optional[str] = Field(None, max_length=100)
+    branch_address: Optional[str] = Field(None, max_length=500)
+
+
+class BranchBulkRequest(BaseModel):
+    bank_id: str = Field(..., min_length=2, max_length=50)
+    branches: list[BranchBulkItem]
+
+
+class AddAccountRequest(BaseModel):
+    bank_id: str = Field(..., min_length=1, max_length=50)
+    account_id: str = Field(..., min_length=1, max_length=100)
+    branch_ifsc: Optional[str] = Field(None, min_length=11, max_length=11)
+    account_type: Optional[str] = Field("savings", pattern=r"^(savings|current|salary|fd|rd)$")
+    account_label: Optional[str] = Field(None, max_length=100)
+
+
+class SetPrimaryRequest(BaseModel):
+    account_id: int
+
+
 @app.on_event("startup")
 async def startup():
     init_db()
@@ -201,19 +248,24 @@ async def root(request: Request):
     return templates.TemplateResponse("app.html", {"request": request})
 
 
-@app.get("/admin", response_class=HTMLResponse)
+@app.get("/portal/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
     return templates.TemplateResponse("admin.html", {"request": request})
 
 
-@app.get("/compliance", response_class=HTMLResponse)
+@app.get("/portal/compliance", response_class=HTMLResponse)
 async def compliance_page(request: Request):
     return templates.TemplateResponse("compliance.html", {"request": request})
 
 
-@app.get("/developer", response_class=HTMLResponse)
+@app.get("/portal/developer", response_class=HTMLResponse)
 async def developer_page(request: Request):
     return templates.TemplateResponse("developer.html", {"request": request})
+
+
+@app.get("/portal/bank-register", response_class=HTMLResponse)
+async def bank_register_page(request: Request):
+    return templates.TemplateResponse("bank_register.html", {"request": request})
 
 
 @app.get("/api/health")
@@ -336,22 +388,157 @@ async def link_bank(req: LinkBankRequest, request: Request,
     if req.bank_id not in AVAILABLE_BANKS:
         raise HTTPException(400, "Bank not found")
 
-    ok, result = await verify_account(req.bank_id, req.account_id.strip().upper())
+    account_id_clean = req.account_id.strip().upper()
+    ok, result = await verify_account(req.bank_id, account_id_clean)
     if not ok:
         raise HTTPException(400, result)
 
-    user.bank_id = req.bank_id
-    user.account_id = req.account_id.strip().upper()
-    db.commit()
+    acc_result = add_user_account(db, user.id, {
+        "bank_id": req.bank_id,
+        "account_id": account_id_clean,
+        "account_type": "savings",
+    })
+
+    if acc_result.get("is_primary", False) or not user.bank_id:
+        user.bank_id = req.bank_id
+        user.account_id = account_id_clean
+        db.commit()
 
     bank = AVAILABLE_BANKS[req.bank_id]
     ip = _client_ip(request)
-    log_audit(db, "BANK_LINKED", user.mobile, f"bank={req.bank_id} acc={user.account_id}", ip_address=ip)
+    log_audit(db, "BANK_LINKED", user.mobile, f"bank={req.bank_id} acc={account_id_clean}", ip_address=ip)
     return {
-        "state": 1, "account_id": user.account_id,
+        "state": 1, "account_id": account_id_clean,
         "bank_name": bank["name"], "bank_label": bank["label"],
         "holder": result
     }
+
+
+@app.post("/api/accounts/add")
+async def api_add_account(req: AddAccountRequest, request: Request,
+                          user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.mobile == user_data["sub"]).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    if req.bank_id not in AVAILABLE_BANKS:
+        raise HTTPException(400, "Bank not found")
+
+    account_id_clean = req.account_id.strip().upper()
+    ok, holder = await verify_account(req.bank_id, account_id_clean)
+    if not ok:
+        raise HTTPException(400, holder)
+
+    result = add_user_account(db, user.id, {
+        "bank_id": req.bank_id,
+        "account_id": account_id_clean,
+        "branch_ifsc": req.branch_ifsc,
+        "account_type": req.account_type or "savings",
+        "account_label": req.account_label,
+    })
+    if not result["success"]:
+        raise HTTPException(400, result["reason"])
+
+    if result.get("is_primary") and (not user.bank_id or not user.account_id):
+        user.bank_id = req.bank_id
+        user.account_id = account_id_clean
+        db.commit()
+
+    ip = _client_ip(request)
+    log_audit(db, "ACCOUNT_ADDED", user.mobile,
+              f"bank={req.bank_id} acc={account_id_clean} type={req.account_type}", ip_address=ip)
+
+    bank = AVAILABLE_BANKS[req.bank_id]
+    return {
+        "state": 1, "id": result["id"], "account_id": account_id_clean,
+        "bank_name": bank["name"], "holder": holder,
+        "is_primary": result["is_primary"],
+    }
+
+
+@app.get("/api/accounts")
+async def api_list_accounts(user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.mobile == user_data["sub"]).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+    return get_user_accounts(db, user.id)
+
+
+@app.post("/api/accounts/set_primary")
+async def api_set_primary(req: SetPrimaryRequest, request: Request,
+                          user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.mobile == user_data["sub"]).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    result = set_primary_account(db, user.id, req.account_id)
+    if not result["success"]:
+        raise HTTPException(400, result["reason"])
+
+    user.bank_id = result["bank_id"]
+    user.account_id = result["primary_account_id"]
+    db.commit()
+
+    ip = _client_ip(request)
+    log_audit(db, "PRIMARY_ACCOUNT_CHANGED", user.mobile,
+              f"bank={result['bank_id']} acc={result['primary_account_id']}", ip_address=ip)
+    return result
+
+
+@app.delete("/api/accounts/{account_id}")
+async def api_remove_account(account_id: int, request: Request,
+                             user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.mobile == user_data["sub"]).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    result = remove_user_account(db, user.id, account_id)
+    if not result["success"]:
+        raise HTTPException(400, result["reason"])
+
+    primary = get_primary_account(db, user.id)
+    if primary:
+        user.bank_id = primary.bank_id
+        user.account_id = primary.account_id
+    else:
+        user.bank_id = None
+        user.account_id = None
+    db.commit()
+
+    ip = _client_ip(request)
+    log_audit(db, "ACCOUNT_REMOVED", user.mobile, f"account_record={account_id}", ip_address=ip)
+    return result
+
+
+@app.get("/api/ifsc/{ifsc_code}")
+async def api_lookup_ifsc(ifsc_code: str, db: Session = Depends(get_db)):
+    result = lookup_by_ifsc(db, ifsc_code)
+    if not result:
+        raise HTTPException(404, "IFSC code not found")
+    return result
+
+
+@app.post("/api/banks/self-register")
+async def api_self_register_bank(req: BankSelfRegisterRequest, request: Request,
+                                 db: Session = Depends(get_db)):
+    result = register_bank(db, {
+        "bank_id": req.bank_id,
+        "name": req.name,
+        "short_code": req.short_code,
+        "api_url": req.api_url,
+        "contact_email": req.contact_email,
+        "contact_name": req.contact_name,
+        "environment": req.environment or "sandbox",
+    }, admin_mobile="self-registration")
+
+    if not result["success"]:
+        raise HTTPException(400, result["reason"])
+
+    ip = _client_ip(request)
+    log_audit(db, "BANK_SELF_REGISTERED", req.contact_email,
+              f"bank_id={req.bank_id} name={req.name}", ip_address=ip)
+
+    return result
 
 
 @app.get("/api/balance")
@@ -658,6 +845,39 @@ async def api_registered_banks(user_data=Depends(get_current_user), db: Session 
     return get_all_registered_banks(db)
 
 
+@app.post("/api/admin/banks/{bank_id}/branches")
+async def api_add_branch(bank_id: str, req: BranchRegisterRequest,
+                         user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user_data, db)
+    result = register_branch(db, bank_id, {
+        "branch_name": req.branch_name,
+        "ifsc_code": req.ifsc_code,
+        "branch_city": req.branch_city,
+        "branch_state": req.branch_state,
+        "branch_address": req.branch_address,
+    }, actor=user_data["sub"])
+    if not result["success"]:
+        raise HTTPException(400, result["reason"])
+    return result
+
+
+@app.get("/api/admin/banks/{bank_id}/branches")
+async def api_list_branches(bank_id: str, user_data=Depends(get_current_user),
+                            db: Session = Depends(get_db)):
+    require_admin(user_data, db)
+    return get_branches_by_bank(db, bank_id)
+
+
+@app.post("/api/admin/banks/{bank_id}/branches/bulk")
+async def api_bulk_branches(bank_id: str, req: BranchBulkRequest,
+                            user_data=Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user_data, db)
+    result = register_branches_bulk(db, bank_id, [b.model_dump() for b in req.branches], actor=user_data["sub"])
+    if not result["success"]:
+        raise HTTPException(400, result["reason"])
+    return result
+
+
 @app.post("/api/admin/seed_demo")
 async def seed_demo(db: Session = Depends(get_db)):
     existing_admin = db.query(User).filter(User.role == "admin").first()
@@ -688,6 +908,15 @@ async def seed_demo(db: Session = Depends(get_db)):
     )
     db.add_all([ram, sita, arjun])
     db.commit()
+
+    for u in [ram, sita, arjun]:
+        if u.bank_id and u.account_id:
+            add_user_account(db, u.id, {
+                "bank_id": u.bank_id,
+                "account_id": u.account_id,
+                "account_type": "savings",
+            })
+
     log_audit(db, "DEMO_SEEDED", "system", "Demo users and admin created")
     logger.info("Demo data seeded successfully")
     return {"message": "Demo data seeded successfully"}

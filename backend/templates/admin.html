@@ -73,8 +73,8 @@ body { display: block; }
     <h1><span>&#9889;</span> AtomicPay Admin</h1>
     <div class="dash-nav">
       <a href="/">App</a>
-      <a href="/compliance">Compliance</a>
-      <a href="/developer">Developer</a>
+      <a href="/portal/compliance">Compliance</a>
+      <a href="/portal/developer">Developer</a>
       <a href="#" onclick="adminLogout()" style="color:var(--red);border-color:rgba(239,68,68,.2)">Logout</a>
     </div>
   </div>
@@ -158,6 +158,25 @@ body { display: block; }
     <div class="section">
       <h2>Registered Banks</h2>
       <div class="scroll-box"><table class="data-table" id="regBanksTable"><tr><td>Loading...</td></tr></table></div>
+    </div>
+    <div class="section">
+      <h2>Branch Management</h2>
+      <div style="background:var(--card);border:1px solid var(--bdr);border-radius:var(--radius);padding:20px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="field"><div class="flbl">Bank ID</div><input class="fi mono" id="brBankId" placeholder="e.g. sbi_main"></div>
+          <div class="field"><div class="flbl">Branch Name *</div><input class="fi" id="brName" placeholder="e.g. MG Road Branch"></div>
+          <div class="field"><div class="flbl">IFSC Code * (11 chars)</div><input class="fi mono" id="brIfsc" placeholder="e.g. SBIN0001234" maxlength="11" style="text-transform:uppercase"></div>
+          <div class="field"><div class="flbl">City</div><input class="fi" id="brCity" placeholder="e.g. Mumbai"></div>
+          <div class="field"><div class="flbl">State</div><input class="fi" id="brState" placeholder="e.g. Maharashtra"></div>
+          <div class="field"><div class="flbl">Address</div><input class="fi" id="brAddress" placeholder="Full branch address"></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px;align-items:center">
+          <button class="btn btn-p" onclick="addBranch()">Add Branch</button>
+          <button class="btn btn-o" onclick="loadBranches()">Load Branches</button>
+          <span id="brMsg" style="font-size:13px;color:var(--muted)"></span>
+        </div>
+      </div>
+      <div class="scroll-box"><table class="data-table" id="branchesTable"><tr><td style="color:var(--dim)">Enter a Bank ID above and click "Load Branches"</td></tr></table></div>
     </div>
   </div>
 
@@ -402,6 +421,63 @@ async function bankAction(action, bankId) {
     loadRegisteredBanks();
   } catch (e) {
     alert('Action failed: ' + e.message);
+  }
+}
+
+async function addBranch() {
+  const msg = document.getElementById('brMsg');
+  const bankId = document.getElementById('brBankId').value.trim();
+  const branchName = document.getElementById('brName').value.trim();
+  const ifsc = document.getElementById('brIfsc').value.trim().toUpperCase();
+  if (!bankId || !branchName || !ifsc) {
+    msg.textContent = 'Bank ID, Branch Name, and IFSC are required'; msg.style.color = 'var(--red)';
+    return;
+  }
+  msg.textContent = 'Adding...'; msg.style.color = 'var(--muted)';
+  try {
+    await aapi(`/admin/banks/${bankId}/branches`, {
+      branch_name: branchName,
+      ifsc_code: ifsc,
+      branch_city: document.getElementById('brCity').value.trim() || undefined,
+      branch_state: document.getElementById('brState').value.trim() || undefined,
+      branch_address: document.getElementById('brAddress').value.trim() || undefined,
+    });
+    msg.textContent = 'Branch added'; msg.style.color = 'var(--green)';
+    document.getElementById('brName').value = '';
+    document.getElementById('brIfsc').value = '';
+    document.getElementById('brCity').value = '';
+    document.getElementById('brState').value = '';
+    document.getElementById('brAddress').value = '';
+    loadBranches();
+  } catch (e) {
+    msg.textContent = e.message; msg.style.color = 'var(--red)';
+  }
+}
+
+async function loadBranches() {
+  const bankId = document.getElementById('brBankId').value.trim();
+  if (!bankId) return;
+  try {
+    const branches = await aapi(`/admin/banks/${bankId}/branches`, null, 'GET');
+    const t = document.getElementById('branchesTable');
+    if (!branches.length) {
+      t.innerHTML = '<tr><td style="color:var(--dim)">No branches registered for this bank</td></tr>';
+      return;
+    }
+    t.innerHTML = '<tr><th>IFSC</th><th>Branch Name</th><th>City</th><th>State</th><th>Status</th><th>Registered</th></tr>';
+    branches.forEach(b => {
+      t.innerHTML += `<tr>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600">${b.ifsc_code}</td>
+        <td>${b.branch_name}</td>
+        <td>${b.branch_city || '\u2014'}</td>
+        <td>${b.branch_state || '\u2014'}</td>
+        <td><span class="state-badge ${b.is_active ? 'sattva' : 'tamas'}">${b.is_active ? 'active' : 'inactive'}</span></td>
+        <td style="font-size:11px;color:var(--muted)">${b.created_at ? new Date(b.created_at).toLocaleDateString() : ''}</td>
+      </tr>`;
+    });
+  } catch (e) {
+    document.getElementById('brMsg').textContent = e.message;
+    document.getElementById('brMsg').style.color = 'var(--red)';
   }
 }
 

@@ -14,6 +14,16 @@ AtomicPay is a production-grade fintech platform implementing a three-state atom
 - **Frontend**: Jinja2 templates with vanilla JS, mobile-first design
 - **Deployment**: Configured for Replit autoscale deployment
 
+## Portal Architecture
+Admin, compliance, and developer pages are separated from the user-facing app:
+- **User App**: `/` — Consumer wallet (no admin links visible)
+- **Admin Portal**: `/portal/admin` — Admin dashboard with bank onboarding, branch mgmt
+- **Compliance Portal**: `/portal/compliance` — AML, fraud, KYC oversight
+- **Developer Portal**: `/portal/developer` — API docs, integration guide
+- **Bank Registration**: `/portal/bank-register` — Public self-registration for banks
+
+Admin users see a "Portal" link in their profile screen.
+
 ## Production Hardening (v2.0)
 - **Security Headers**: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy, HSTS (production)
 - **GZip Compression**: All responses > 500 bytes compressed
@@ -37,21 +47,25 @@ AtomicPay is a production-grade fintech platform implementing a three-state atom
 - **Database Indexes**: Composite indexes on sender_mobile+created_at, audit timestamps
 - **Swagger Docs**: Hidden in production (REPL_DEPLOYMENT=1)
 
-## UI Design System
-- **Theme**: Pure black (#000000) with glassmorphism, Inter + JetBrains Mono fonts
-- **CSS Variables**: --accent (#6366f1 indigo), --green, --red, --gold for state badges
-- **State Badges**: `.state-badge.sattva` (green), `.state-badge.tamas` (red), `.state-badge.rajas` (gold)
-- **PIN Confirmation**: Full overlay with numeric keypad
-- **UPI Integration UI**: GPay/PhonePe/Paytm/AtomicPay integration cards
-- **Toast Notifications**: Non-blocking success/error toasts
-- **SVG Icons**: All navigation and action icons use inline SVGs
+## Branch & Multi-Account System
+- **BankBranch model**: bank_id, branch_name, ifsc_code (11 chars, unique), branch_city, branch_state, branch_address
+- **IFSC format**: 4-char bank code + 0 + 6-char branch code (e.g., SBIN0001234)
+- **UserBankAccount model**: user_id, bank_id, branch_ifsc, account_id, account_type, account_label, is_primary
+- Users can have multiple accounts (same bank, different branches, different types)
+- Primary account used for payments by default, user can switch
+- Unique constraint: (user_id, bank_id, account_id) — prevents duplicate links
+- Backward compatible: User.bank_id / User.account_id still tracked for primary account
 
-## Payment Flow (Frontend)
-1. `initiateSend()` - validates recipient + amount, stores PENDING_PAYMENT
-2. `openPinConfirm()` - shows PIN keypad overlay
-3. User enters 4-digit PIN on keypad
-4. `verifyPinAndSend()` - calls `/api/login` to verify PIN, then `/api/pay`
-5. `showResult()` - displays result sheet with state badge and details
+## Real Bank Onboarding
+- Banks can self-register via `/portal/bank-register` (public, no auth required, status=pending)
+- Admin also can register banks via admin dashboard
+- Admin approves bank (status=active) → `_sync_bank_to_available()` adds to AVAILABLE_BANKS
+- Bank model stores: api_key (apk_live_*), webhook_secret (whsec_*), environment, health_status
+- Startup calls `load_active_banks_from_db()` to restore approved banks into AVAILABLE_BANKS
+- Simulator banks (bank_a, bank_b) are NOT in DB — they remain via `start_bank_simulators()`
+- Admin can suspend/reactivate banks, regenerate API keys, run health checks and connectivity tests
+- Branch management: add branches with IFSC codes, view per-bank branch list
+- All actions are audit-logged
 
 ## Project Structure
 ```
@@ -60,11 +74,11 @@ backend/
   main.py                  - FastAPI app with all routes + exception handlers
   config.py                - Configuration (DB, JWT, limits, rate limiting)
   database.py              - SQLAlchemy engine with pool settings + PG timeouts
-  models.py                - ORM models (Users, Banks, Transactions, KYC, AML, Fraud, Audit)
+  models.py                - ORM models (Users, Banks, BankBranch, UserBankAccount, Transactions, KYC, AML, Fraud, Audit)
   auth.py                  - JWT auth + PBKDF2 PIN hashing
   payments.py              - Two-phase atomic payment engine with idempotency
   banks.py                 - Bank simulators + async bank calls with retry
-  bank_connector.py        - Real bank onboarding lifecycle (register/approve/suspend/test/health)
+  bank_connector.py        - Bank onboarding + branch mgmt + multi-account functions
   middleware.py             - RequestID, SecurityHeaders, RateLimit middleware
   fraud_detection.py       - Fraud scoring engine
   aml.py                   - Anti-money laundering checks
@@ -72,34 +86,31 @@ backend/
   compliance.py            - Audit logging with error resilience
   monitoring.py            - System monitoring with fallback
   templates/
-    app.html               - Main wallet UI (mobile-first, PIN confirm overlay)
-    admin.html             - Admin dashboard (tabbed, metrics grid)
+    app.html               - Main wallet UI (mobile-first, multi-account, PIN confirm overlay)
+    admin.html             - Admin dashboard (bank onboarding, branch mgmt)
     compliance.html        - Compliance dashboard (AML, fraud, KYC, reports)
     developer.html         - Developer portal / API docs / integration guide
+    bank_register.html     - Public bank self-registration portal
   static/
     css/style.css           - Global design system (glassmorphism, state badges)
-    js/app.js               - Main wallet JS (PIN flow, toasts)
+    js/app.js               - Main wallet JS (multi-account, PIN flow, toasts)
 sdk/
   atomicpay_bank_sdk.py    - Python Bank SDK
 ```
 
 ## Key API Endpoints
 - GET /api/health - Health check (DB status, uptime)
-- GET /api/ping - Simple liveness check
 - POST /api/register, /api/login - Auth
 - POST /api/pay - Atomic payment (supports idempotency_key)
 - GET /api/balance, /api/history - Account info
-- POST /api/link_bank - Link bank account
-- POST /api/find_user - Search users
-- /api/kyc/* - KYC verification
-- /api/admin/* - Admin operations (requires admin role)
-- /api/admin/banks/register - Register a new real bank (generates API key + webhook secret)
-- /api/admin/banks/approve - Approve a pending bank (syncs to AVAILABLE_BANKS)
-- /api/admin/banks/suspend - Suspend an active bank
-- /api/admin/banks/test - Run connectivity tests against a bank
-- /api/admin/banks/health_check - Ping a bank and update health status
-- /api/admin/banks/regenerate_key - Regenerate a bank's API key
-- /api/admin/banks/registered - List all registered banks
+- POST /api/link_bank - Link bank account (also creates UserBankAccount)
+- POST /api/accounts/add - Add additional bank account
+- GET /api/accounts - List user's linked accounts
+- POST /api/accounts/set_primary - Set default payment account
+- DELETE /api/accounts/{id} - Remove a linked account
+- GET /api/ifsc/{code} - IFSC code lookup
+- POST /api/banks/self-register - Public bank self-registration
+- /api/admin/banks/* - Bank management (register/approve/suspend/test/health/regenerate_key/branches)
 - /api/compliance/* - Compliance dashboard data
 - /api/regulatory/* - Regulatory reports
 
@@ -112,15 +123,7 @@ sdk/
 - PIN re-authentication required before every payment
 - Security headers on all responses
 - HMAC-SHA256 transaction signatures
-
-## Real Bank Onboarding
-- Banks register via admin dashboard or API (status=pending)
-- Admin approves bank (status=active) → `_sync_bank_to_available()` adds to AVAILABLE_BANKS
-- Bank model stores: api_key (apk_live_*), webhook_secret (whsec_*), environment, health_status
-- Startup calls `load_active_banks_from_db()` to restore approved banks into AVAILABLE_BANKS
-- Simulator banks (bank_a, bank_b) are NOT in DB — they remain via `start_bank_simulators()`
-- Admin can suspend/reactivate banks, regenerate API keys, run health checks and connectivity tests
-- All actions are audit-logged
+- Admin/Compliance portals separated from user-facing app
 
 ## Demo Credentials
 - Ram: 9876543210 / 1234 (Bank A, account RAM_001)

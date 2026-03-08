@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AtomicPay - Bank Registration</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<style>
+body { background: var(--bg); color: var(--fg); min-height: 100vh; }
+.reg-wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 60px; }
+.reg-header { text-align: center; margin-bottom: 36px; }
+.reg-header h1 { font-size: 28px; margin: 0 0 8px; }
+.reg-header h1 span { font-size: 36px; }
+.reg-header p { color: var(--muted); font-size: 14px; margin: 0; }
+.reg-card { background: var(--card); border: 1px solid var(--bdr); border-radius: var(--radius); padding: 28px; }
+.reg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 600px) { .reg-grid { grid-template-columns: 1fr; } }
+.reg-card .field { margin-bottom: 0; }
+.reg-card .flbl { font-size: 12px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .5px; }
+.reg-card .fi { background: var(--sur); border: 1px solid var(--bdr); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--fg); font-size: 14px; width: 100%; box-sizing: border-box; }
+.reg-card .fi:focus { border-color: var(--accent); outline: none; }
+.req { color: var(--red); }
+.reg-actions { display: flex; gap: 12px; margin-top: 20px; align-items: center; }
+.reg-msg { font-size: 13px; color: var(--muted); }
+.reg-result { display: none; margin-top: 20px; padding: 20px; background: var(--sur); border: 1px solid var(--green); border-radius: var(--radius-sm); }
+.reg-result h3 { color: var(--green); margin: 0 0 12px; font-size: 16px; }
+.cred-box { font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 2.2; background: var(--bg); padding: 16px; border-radius: 8px; margin-top: 10px; }
+.cred-box .label { color: var(--muted); }
+.cred-box .value { color: var(--accent2); word-break: break-all; }
+.warn-box { margin-top: 14px; padding: 12px 16px; background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.2); border-radius: var(--radius-sm); font-size: 13px; color: var(--gold); line-height: 1.5; }
+.info-steps { margin-top: 28px; }
+.info-steps h3 { font-size: 16px; margin: 0 0 14px; }
+.step { display: flex; gap: 14px; margin-bottom: 18px; }
+.step-num { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-glow); color: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+.step-info h4 { margin: 0 0 4px; font-size: 14px; }
+.step-info p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
+.nav-links { display: flex; gap: 10px; justify-content: center; margin-bottom: 28px; }
+.nav-links a { color: var(--muted); font-size: 13px; text-decoration: none; padding: 6px 14px; border: 1px solid var(--bdr); border-radius: var(--radius-sm); }
+.nav-links a:hover { color: var(--accent); border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="reg-wrap">
+  <div class="reg-header">
+    <h1><span>&#9889;</span> AtomicPay</h1>
+    <p>Bank Partner Registration Portal</p>
+  </div>
+
+  <div class="nav-links">
+    <a href="/">App</a>
+    <a href="/portal/developer">Developer Docs</a>
+    <a href="/portal/admin">Admin</a>
+  </div>
+
+  <div class="info-steps">
+    <h3>How Bank Onboarding Works</h3>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-info">
+        <h4>Register</h4>
+        <p>Fill out the form below with your bank's details. You'll receive API credentials immediately.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-info">
+        <h4>Implement Bridge API</h4>
+        <p>Build a POST endpoint that handles DEBIT, CREDIT, UNLOCK, and STATUS actions. See the <a href="/portal/developer" style="color:var(--accent)">Developer Docs</a> for the full spec.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-info">
+        <h4>Admin Approval</h4>
+        <p>An AtomicPay admin reviews your registration, runs connectivity tests, and approves your bank to go live.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-info">
+        <h4>Go Live</h4>
+        <p>Once approved, your bank appears in the network and users can link their accounts and transact atomically.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="reg-card">
+    <h3 style="margin:0 0 18px;font-size:18px">Register Your Bank</h3>
+    <div class="reg-grid">
+      <div class="field">
+        <div class="flbl">Bank Name <span class="req">*</span></div>
+        <input class="fi" id="srName" placeholder="e.g. State Bank of India">
+      </div>
+      <div class="field">
+        <div class="flbl">Bank ID <span class="req">*</span> (lowercase, underscores)</div>
+        <input class="fi" id="srBankId" placeholder="e.g. sbi_main" style="font-family:'JetBrains Mono',monospace">
+      </div>
+      <div class="field">
+        <div class="flbl">API URL <span class="req">*</span></div>
+        <input class="fi" id="srUrl" placeholder="https://your-bank-api.com/atomicpay" style="font-family:'JetBrains Mono',monospace">
+      </div>
+      <div class="field">
+        <div class="flbl">IFSC Prefix (4-char bank code)</div>
+        <input class="fi" id="srIfsc" placeholder="e.g. SBIN" maxlength="4" style="text-transform:uppercase">
+      </div>
+      <div class="field">
+        <div class="flbl">Contact Name <span class="req">*</span></div>
+        <input class="fi" id="srContact" placeholder="Technical Contact Name">
+      </div>
+      <div class="field">
+        <div class="flbl">Contact Email <span class="req">*</span></div>
+        <input class="fi" id="srEmail" placeholder="tech@yourbank.com">
+      </div>
+      <div class="field">
+        <div class="flbl">Short Code</div>
+        <input class="fi" id="srShort" placeholder="e.g. SBI" maxlength="10">
+      </div>
+      <div class="field">
+        <div class="flbl">Environment</div>
+        <select class="fi" id="srEnv">
+          <option value="sandbox">Sandbox</option>
+          <option value="production">Production</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="reg-actions">
+      <button class="btn btn-p" onclick="submitRegistration()">Register Bank</button>
+      <span class="reg-msg" id="srMsg"></span>
+    </div>
+
+    <div class="reg-result" id="srResult">
+      <h3>Registration Successful</h3>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 8px">Save these credentials securely. The API key will not be shown again.</p>
+      <div class="cred-box">
+        <div><span class="label">Bank ID:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="value" id="srResId"></span></div>
+        <div><span class="label">API Key:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="value" id="srResKey"></span></div>
+        <div><span class="label">Webhook Secret:&nbsp;&nbsp;</span><span class="value" id="srResWebhook"></span></div>
+        <div><span class="label">Status:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="value" id="srResStatus"></span></div>
+      </div>
+      <div class="warn-box">
+        Your bank is registered with status <strong>pending</strong>. An AtomicPay administrator will review your registration and run connectivity tests before approving your bank to go live.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function submitRegistration() {
+  const msg = document.getElementById('srMsg');
+  const result = document.getElementById('srResult');
+  msg.textContent = 'Registering...'; msg.style.color = 'var(--muted)';
+  result.style.display = 'none';
+
+  const data = {
+    name: document.getElementById('srName').value.trim(),
+    bank_id: document.getElementById('srBankId').value.trim().toLowerCase(),
+    api_url: document.getElementById('srUrl').value.trim(),
+    contact_name: document.getElementById('srContact').value.trim(),
+    contact_email: document.getElementById('srEmail').value.trim(),
+    ifsc_prefix: document.getElementById('srIfsc').value.trim().toUpperCase() || undefined,
+    short_code: document.getElementById('srShort').value.trim() || undefined,
+    environment: document.getElementById('srEnv').value,
+  };
+
+  if (!data.name || !data.bank_id || !data.api_url || !data.contact_name || !data.contact_email) {
+    msg.textContent = 'Please fill in all required fields'; msg.style.color = 'var(--red)';
+    return;
+  }
+
+  try {
+    const r = await fetch('/api/banks/self-register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.detail || 'Registration failed');
+    }
+    const res = await r.json();
+    msg.textContent = '';
+    document.getElementById('srResId').textContent = res.bank_id;
+    document.getElementById('srResKey').textContent = res.api_key;
+    document.getElementById('srResWebhook').textContent = res.webhook_secret;
+    document.getElementById('srResStatus').textContent = res.status;
+    result.style.display = 'block';
+  } catch (e) {
+    msg.textContent = e.message; msg.style.color = 'var(--red)';
+  }
+}
+</script>
+</body>
+</html>

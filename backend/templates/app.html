@@ -43,9 +43,7 @@
     The World's First Atomic Payment System
   </div>
   <div class="wlinks">
-    <a href="/admin">Admin</a>
-    <a href="/compliance">Compliance</a>
-    <a href="/developer">Developer</a>
+    <a href="/portal/developer">Developer</a>
   </div>
 </div>
 
@@ -143,6 +141,10 @@
       <span class="chip" id="bAccId"></span>
       <span class="chip" id="bBank"></span>
     </div>
+  </div>
+
+  <div id="accountSelector" style="display:none;padding:0 16px 4px">
+    <div id="accountSelectorInner" style="display:flex;gap:8px;overflow-x:auto;padding:4px 0;scrollbar-width:none"></div>
   </div>
 
   <div class="qa">
@@ -276,21 +278,15 @@
     <div id="pKycBadge"></div>
   </div>
 
+  <div class="stitle">Linked Accounts</div>
+  <div id="pAccountsList" style="padding:0 16px 8px">
+    <div style="color:var(--dim);font-size:13px;padding:12px 0">Loading accounts...</div>
+  </div>
+  <div style="padding:0 16px 16px">
+    <button class="btn btn-o btn-sm" onclick="showAddAccount()" style="width:100%">+ Add Account</button>
+  </div>
+
   <div class="profile-section">
-    <div class="profile-row">
-      <div class="pr-icon" style="background:var(--blue-bg);color:var(--blue)">&#127974;</div>
-      <div class="pr-info">
-        <div class="pr-label">Bank Account</div>
-        <div class="pr-value" id="pBank">Not linked</div>
-      </div>
-    </div>
-    <div class="profile-row">
-      <div class="pr-icon" style="background:var(--accent-glow);color:var(--accent)">&#128179;</div>
-      <div class="pr-info">
-        <div class="pr-label">Account Number</div>
-        <div class="pr-value" id="pAccount" style="font-family:'JetBrains Mono',monospace">&mdash;</div>
-      </div>
-    </div>
     <div class="profile-row">
       <div class="pr-icon" style="background:var(--green-bg);color:var(--green)">&#9989;</div>
       <div class="pr-info">
@@ -342,6 +338,10 @@
       </div>
       <div class="pr-arrow">&#8250;</div>
     </div>
+  </div>
+
+  <div id="portalLink" style="padding:0 16px 8px;display:none">
+    <a href="/portal/admin" style="font-size:12px;color:var(--dim);text-decoration:none;display:inline-block;padding:6px 0">Portal &rsaquo;</a>
   </div>
 
   <div style="padding:12px 16px 40px">
@@ -436,6 +436,46 @@
     <div class="rdets" id="rdets"></div>
     <div class="rsteps" id="rsteps"></div>
     <button class="btn btn-p" onclick="closeResult()">Done</button>
+  </div>
+</div>
+
+<div class="moverlay" id="addAccountModal" onclick="closeAddAccount()">
+  <div class="modal" onclick="event.stopPropagation()" style="max-height:85vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <h3>Add Bank Account</h3>
+    <div class="err" id="addAccErr"></div>
+    <div class="field">
+      <div class="flbl">Select Bank</div>
+      <div class="bank-grid" id="addAccBankGrid">
+        <div style="color:var(--dim);font-size:13px;padding:12px">Loading banks...</div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="flbl">Account Number</div>
+      <input class="fi mono" type="text" id="addAccId" placeholder="e.g. RAM_002" autocomplete="off" autocapitalize="characters">
+    </div>
+    <div class="field">
+      <div class="flbl">IFSC Code (optional)</div>
+      <input class="fi mono" type="text" id="addAccIfsc" placeholder="e.g. SBIN0001234" maxlength="11" autocomplete="off" autocapitalize="characters">
+    </div>
+    <div style="display:flex;gap:8px">
+      <div class="field" style="flex:1">
+        <div class="flbl">Account Type</div>
+        <select class="select-fi" id="addAccType">
+          <option value="savings">Savings</option>
+          <option value="current">Current</option>
+          <option value="salary">Salary</option>
+          <option value="fd">FD</option>
+          <option value="rd">RD</option>
+        </select>
+      </div>
+      <div class="field" style="flex:1">
+        <div class="flbl">Label (optional)</div>
+        <input class="fi" type="text" id="addAccLabel" placeholder="e.g. Personal" autocomplete="off">
+      </div>
+    </div>
+    <button class="btn btn-g" id="addAccBtn" onclick="doAddAccount()" style="margin-top:8px">Verify &amp; Add Account</button>
+    <button class="btn btn-o" onclick="closeAddAccount()" style="margin-top:8px">Cancel</button>
   </div>
 </div>
 

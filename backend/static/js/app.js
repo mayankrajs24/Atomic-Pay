@@ -178,6 +178,51 @@ async function goHome() {
   loadBal();
   loadHistory();
   setNav('home');
+  renderAccountSelector();
+}
+
+async function renderAccountSelector() {
+  const sel = $('accountSelector');
+  const inner = $('accountSelectorInner');
+  if (!ME.accounts || ME.accounts.length < 2) {
+    if (!ME.accounts) {
+      try {
+        ME.accounts = await api('/accounts');
+      } catch(e) { ME.accounts = []; }
+    }
+  }
+  if (!ME.accounts || ME.accounts.length < 2) {
+    sel.style.display = 'none';
+    return;
+  }
+  sel.style.display = 'block';
+  inner.innerHTML = ME.accounts.map(a => {
+    const active = a.is_primary;
+    const bankLabel = a.bank_name || a.bank_id;
+    return `<div onclick="switchAccount(${a.id})" style="flex:0 0 auto;padding:8px 14px;border-radius:10px;cursor:pointer;border:1px solid ${active ? 'var(--accent)' : 'var(--bdr)'};background:${active ? 'var(--accent-glow)' : 'var(--card)'};white-space:nowrap">
+      <div style="font-size:12px;font-weight:600;color:${active ? 'var(--accent)' : 'var(--txt)'}">${bankLabel}</div>
+      <div style="font-size:10px;color:var(--dim);font-family:'JetBrains Mono',monospace">${a.account_id}</div>
+    </div>`;
+  }).join('');
+}
+
+async function switchAccount(id) {
+  try {
+    await api('/accounts/set_primary', { account_id: id });
+    ME.accounts = await api('/accounts');
+    const primary = ME.accounts.find(a => a.is_primary);
+    if (primary) {
+      ME.bank_id = primary.bank_id;
+      ME.account_id = primary.account_id;
+      ME.bank_name = primary.bank_name || primary.bank_id;
+    }
+    $('hSub').textContent = ME.bank_name ? `${ME.bank_label || ME.bank_name} \u00B7 ${ME.account_id}` : 'No bank linked';
+    loadBal();
+    renderAccountSelector();
+    showToast('Switched account', 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
 }
 
 async function loadBal() {
@@ -455,8 +500,6 @@ function goProfile() {
   av.style.background = ME.avatar_color || 'linear-gradient(135deg, var(--accent), #4f46e5)';
   $('pName').textContent = ME.name || '\u2014';
   $('pMobile').textContent = ME.mobile || '\u2014';
-  $('pBank').textContent = ME.bank_name || 'Not linked';
-  $('pAccount').textContent = ME.account_id || '\u2014';
 
   const kycLevel = ME.kyc_level || 0;
   $('pKyc').textContent = `Level ${kycLevel}`;
@@ -469,8 +512,148 @@ function goProfile() {
     badge.innerHTML = '<span class="kyc-badge unverified">Not Verified</span>';
   }
 
+  const portalEl = $('portalLink');
+  if (portalEl) portalEl.style.display = ME.role === 'admin' ? 'block' : 'none';
+
   setNav('profile');
   loadKycStatus();
+  loadAccounts();
+}
+
+async function loadAccounts() {
+  const container = $('pAccountsList');
+  try {
+    const accounts = await api('/accounts');
+    ME.accounts = accounts;
+    if (!accounts.length) {
+      container.innerHTML = '<div style="color:var(--dim);font-size:13px;padding:12px 0">No accounts linked yet. Add one below.</div>';
+      return;
+    }
+    container.innerHTML = accounts.map(a => {
+      const bankLabel = a.bank_name || a.bank_id;
+      const typeLabel = (a.account_type || 'savings').charAt(0).toUpperCase() + (a.account_type || 'savings').slice(1);
+      const primaryBadge = a.is_primary ? '<span style="background:var(--accent);color:#fff;font-size:10px;padding:2px 6px;border-radius:6px;margin-left:6px;font-weight:600">PRIMARY</span>' : '';
+      const ifscLine = a.branch_ifsc ? `<div style="font-size:11px;color:var(--dim);margin-top:2px">IFSC: ${a.branch_ifsc}</div>` : '';
+      const labelLine = a.account_label ? ` \u00B7 ${a.account_label}` : '';
+      return `<div style="background:var(--card);border:1px solid var(--bdr);border-radius:14px;padding:14px;margin-bottom:8px;position:relative">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:38px;height:38px;border-radius:10px;background:var(--blue-bg);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:18px">&#127974;</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:600;color:var(--txt)">${bankLabel}${primaryBadge}</div>
+            <div style="font-size:12px;color:var(--dim);font-family:'JetBrains Mono',monospace;margin-top:2px">${a.account_id}</div>
+            <div style="font-size:11px;color:var(--dim);margin-top:2px">${typeLabel}${labelLine}</div>
+            ${ifscLine}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            ${!a.is_primary ? `<button onclick="setPrimaryAccount(${a.id})" style="background:none;border:1px solid var(--accent);color:var(--accent);font-size:10px;padding:4px 8px;border-radius:6px;cursor:pointer">Set Primary</button>` : ''}
+            ${!a.is_primary ? `<button onclick="removeAccount(${a.id})" style="background:none;border:1px solid var(--red);color:var(--red);font-size:10px;padding:4px 8px;border-radius:6px;cursor:pointer">Remove</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    container.innerHTML = '<div style="color:var(--dim);font-size:13px;padding:12px 0">Could not load accounts</div>';
+  }
+}
+
+async function setPrimaryAccount(id) {
+  try {
+    await api('/accounts/set_primary', { account_id: id });
+    showToast('Primary account updated', 'success');
+    loadAccounts();
+    loadBal();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function removeAccount(id) {
+  if (!confirm('Remove this account?')) return;
+  try {
+    await api('/accounts/' + id, null, 'DELETE');
+    showToast('Account removed', 'success');
+    loadAccounts();
+    loadBal();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+function showAddAccount() {
+  $('addAccountModal').classList.add('on');
+  $('addAccId').value = '';
+  $('addAccIfsc').value = '';
+  $('addAccLabel').value = '';
+  $('addAccType').value = 'savings';
+  hideErr('addAccErr');
+  loadAddAccBanks();
+}
+
+function closeAddAccount() {
+  $('addAccountModal').classList.remove('on');
+}
+
+async function loadAddAccBanks() {
+  try {
+    const banks = await api('/banks');
+    const grid = $('addAccBankGrid');
+    grid.innerHTML = '';
+    banks.forEach(b => {
+      const card = document.createElement('div');
+      card.className = 'bcard';
+      card.onclick = () => {
+        grid.querySelectorAll('.bcard').forEach(c => c.classList.remove('sel'));
+        card.classList.add('sel');
+        card.dataset.bankId = b.id;
+      };
+      card.dataset.bankId = b.id;
+      card.innerHTML = `
+        <div class="bico">${b.icon}</div>
+        <div class="binf">
+          <div class="bnm">${b.name}</div>
+          <div class="bsh">${b.short} \u00B7 ${b.label}</div>
+          <div class="bonl ${b.online ? 'online' : 'offline'}">${b.online ? 'Online' : 'Offline'}</div>
+        </div>
+        <div class="bchk">&#10003;</div>
+      `;
+      grid.appendChild(card);
+    });
+  } catch (e) {
+    $('addAccBankGrid').innerHTML = '<div style="color:var(--red);font-size:13px;padding:12px">Failed to load banks</div>';
+  }
+}
+
+async function doAddAccount() {
+  hideErr('addAccErr');
+  const sel = document.querySelector('#addAccBankGrid .bcard.sel');
+  if (!sel) return showErr('addAccErr', 'Select a bank first');
+  const bankId = sel.dataset.bankId;
+  const accountId = $('addAccId').value.trim();
+  if (!accountId) return showErr('addAccErr', 'Enter your account number');
+  const ifsc = $('addAccIfsc').value.trim() || null;
+  const accountType = $('addAccType').value;
+  const label = $('addAccLabel').value.trim() || null;
+
+  const btn = $('addAccBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Verifying...';
+  try {
+    const r = await api('/accounts/add', {
+      bank_id: bankId,
+      account_id: accountId,
+      branch_ifsc: ifsc,
+      account_type: accountType,
+      account_label: label
+    });
+    showToast('Account added: ' + r.holder + ' @ ' + r.bank_name, 'success');
+    closeAddAccount();
+    loadAccounts();
+    loadBal();
+  } catch (e) {
+    showErr('addAccErr', e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = 'Verify & Add Account';
 }
 
 async function loadKycStatus() {
