@@ -186,13 +186,15 @@ REPL_DEPLOYMENT=0
 * Example: `Pass@123` → `Pass%40123`.
 * Ensure the PostgreSQL database (`atomicpay`) exists before running the application.
 
-### Run the Server
 
-```
-uvicorn main:app --reload
-```
 
 ## Run Command
 ```
 python main.py
+```
+
+### Visit URL
+
+```
+http://localhost:5000/
 ```
